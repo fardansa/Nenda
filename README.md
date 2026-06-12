@@ -37,7 +37,6 @@
    # DB_UNIX_SOCKET=/opt/lampp/var/mysql/mysql.sock (Komentari atau hapus baris ini di Windows)
    ```
 
-
 ## Langkah 3: Setup Virtual Environment dan Install Dependensi Python
 
 1. Buka terminal
@@ -45,7 +44,7 @@
    ```cmd
    cd path\to\Nenda\backend
    ```
-3. Buat Virtual Environment (lingkungan virtual Python) agar dependensi proyek tidak mengotori instalasi Python global Anda:
+3. Buat Virtual Environment:
    ```cmd
    python -m venv env
    ```
@@ -58,7 +57,7 @@
      ```powershell
      .\env\Scripts\activate
      ```
-5. Setelah Virtual Environment aktif (ditandai dengan adanya teks `(env)` di awal baris terminal), instal seluruh dependensi yang tertera di `requirements.txt`:
+5. Setelah Virtual Environment aktif, instal seluruh dependensi yang tertera di `requirements.txt`:
    ```cmd
    pip install -r requirements.txt
    ```
@@ -70,20 +69,12 @@
    ```cmd
    python server.py
    ```
-3. Alternatif lainnya, Anda juga dapat menjalankannya menggunakan `uvicorn`:
-   ```cmd
-   uvicorn server:app --host 127.0.0.1 --port 6969 --reload
-   ```
-4. Server sekarang sudah berjalan! Silakan buka browser Anda dan akses aplikasi melalui:
-   [http://localhost:6969](http://localhost:6969) atau [http://127.0.0.1:6969](http://127.0.0.1:6969)
-
----
 
 ## Troubleshooting (Penyelesaian Masalah)
 
-* **Error: `Database connection error` saat menjalankan server**
+- **Error: `Database connection error` saat menjalankan server**
   Pastikan modul MySQL di XAMPP Control Panel sudah dalam keadaan aktif (berwarna hijau) dan konfigurasi file `.env` Anda sudah benar (terutama username `root` dan password yang kosong).
-* **Error: `Scripts cannot be loaded...` saat mengaktifkan virtual environment di PowerShell**
+- **Error: `Scripts cannot be loaded...` saat mengaktifkan virtual environment di PowerShell**
   Gunakan Command Prompt (CMD) sebagai terminal alternatif, atau jalankan perintah berikut di PowerShell Anda sebelum mengaktifkan virtual env:
   ```powershell
   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
