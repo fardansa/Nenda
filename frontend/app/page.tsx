@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tent, MapPin, Users, CheckCircle2, User } from 'lucide-react';
-// Import komponen Interactive Selector yang baru saja dibuat
 import InteractiveSelector from '@/components/ui/interactive-selector';
+import Footer from '@/components/ui/footer';
 
 export default function HomePage() {
   const [tents, setTents] = useState<any[]>([]);
@@ -126,7 +126,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* INTERACTIVE SELECTOR COMPONENT (Terintegrasi di sini) */}
+      {/* INTERACTIVE SELECTOR SECTION */}
       <div className="max-w-7xl mx-auto px-6">
         <InteractiveSelector />
       </div>
@@ -149,7 +149,7 @@ export default function HomePage() {
                 <div key={tent.tent_id} className="bg-stone-50 border border-stone-200 rounded-3xl overflow-hidden hover:shadow-xl transition-shadow group flex flex-col">
                   <div className="h-48 overflow-hidden relative">
                     <img 
-                      src={`https://images.unsplash.com/photo-1504280390467-33348873099b?w=600&auto=format&fit=crop&q=60`} 
+                      src="https://images.unsplash.com/photo-1510312305653-8ed496efae75?q=80&w=600&auto=format&fit=crop" 
                       alt="Tent" 
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
@@ -206,6 +206,9 @@ export default function HomePage() {
           )}
         </div>
       </section>
+
+      {/* FOOTER SECTION */}
+      <Footer />
       
     </div>
   );
