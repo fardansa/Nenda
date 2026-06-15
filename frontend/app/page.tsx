@@ -146,22 +146,23 @@ export default function HomePage() {
           ) : tents.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {tents.map((tent) => (
-                <div key={tent.tent_id} className="bg-stone-50 border border-stone-200 rounded-3xl overflow-hidden hover:shadow-xl transition-shadow group flex flex-col">
+                <div key={tent.paket_id} className="bg-stone-50 border border-stone-200 rounded-3xl overflow-hidden hover:shadow-xl transition-shadow group flex flex-col">
                   <div className="h-48 overflow-hidden relative">
                     <img 
                       src="https://images.unsplash.com/photo-1510312305653-8ed496efae75?q=80&w=600&auto=format&fit=crop" 
                       alt="Tent" 
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
-                    <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-extrabold text-stone-800 shadow-sm">
-                      Loker: {tent.nomor_loker}
-                    </div>
                   </div>
                   <div className="p-6 flex flex-col flex-1">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xl font-bold text-stone-900">{tent.nama_paket}</h3>
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold">
-                        Tenda #{tent.nomor_tent}
+                      <h3 className="text-xl font-bold text-stone-900 first-letter:uppercase">{tent.nama_paket}</h3>
+                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                        tent.status === 'Tersedia' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {tent.status === 'Tersedia' ? `${tent.available_count} Tenda Tersedia` : 'Tenda Penuh'}
                       </span>
                     </div>
                     <p className="text-stone-500 text-sm mb-4 line-clamp-2">{tent.deskripsi}</p>

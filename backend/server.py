@@ -226,21 +226,20 @@ def get_current_user(request: Request):
     return payload
 
 @app.get("/api/tents")
-def get_tents_data(request: Request):
-    token = request.cookies.get("session_token")
-    if not token or not decode_access_token(token):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-        
+def get_tents_data():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        # Query joining tent with camp packages to fetch prices and names
+        # Query fetching all packages from the 'paket' table along with count of available tents and availability status
         query = """
-            SELECT t.tent_id, t.nomor_tent, t.nomor_loker, t.status,
-                   p.nama_paket, p.deskripsi, p.fasilitas, p.kapasitas, p.harga
-            FROM tent t
-            JOIN paket p ON t.paket_id = p.paket_id
-            ORDER BY t.nomor_tent ASC
+            SELECT p.paket_id, p.nama_paket, p.deskripsi, p.fasilitas, p.kapasitas, p.harga,
+                   (SELECT COUNT(*) FROM tent t WHERE t.paket_id = p.paket_id AND t.status = 'tersedia') AS available_count,
+                   CASE 
+                       WHEN (SELECT COUNT(*) FROM tent t WHERE t.paket_id = p.paket_id AND t.status = 'tersedia') > 0 THEN 'Tersedia'
+                       ELSE 'Tidak Tersedia'
+                   END AS status
+            FROM paket p
+            ORDER BY p.paket_id ASC
         """
         cursor.execute(query)
         tents = cursor.fetchall()
