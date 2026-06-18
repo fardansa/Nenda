@@ -25,15 +25,13 @@ export default function BookingPage() {
         const response = await fetch('http://localhost:6969/api/tents');
         if (response.ok) {
           const data = await response.json();
-          // Kita format datanya agar sesuai dengan kebutuhan UI denah
           const formattedPackages = data.tents.map((p: any) => ({
             id: p.paket_id,
-            nama: p.nama_paket.toUpperCase(), // 'single' jadi 'SINGLE'
+            nama: p.nama_paket.toUpperCase(), 
             harga: p.harga,
             kapasitas: p.kapasitas,
-            // Menambahkan prefix manual karena di tabel 'paket' tidak ada
             prefix: p.paket_id === 1 ? "S" : p.paket_id === 2 ? "D" : "F",
-            totalTenda: p.paket_id === 3 ? 20 : 10 // Sesuai data INSERT INTO tent kamu
+            totalTenda: p.paket_id === 3 ? 20 : 10 
           }));
           setPackagesDB(formattedPackages);
         } else {
