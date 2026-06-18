@@ -166,6 +166,10 @@ CREATE TABLE `user` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+INSERT INTO `user` (`nama`, `email`, `password`, `role`, `created_at`) VALUES
+('Admin', 'admin@nenda.com', '$2b$12$zbRffDlEOL8eo74CJej2Ne9LWu6FKrf04ahb9XhX6Q4/7dndv45RW', 'admin', '2023-01-01 00:00:00'),
+('User', 'user@nenda.com', '$2b$12$6v0DmE6B/nPGu6vNGE2jdenBKqu5lK5CtdZuzfEnBPxb53SyhWH0K', 'user', '2023-01-01 00:00:00');
+
 --
 -- Indexes for dumped tables
 --
