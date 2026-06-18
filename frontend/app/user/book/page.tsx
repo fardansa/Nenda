@@ -86,8 +86,23 @@ export default function BookingPage() {
   };
 
   const handleSubmit = () => {
-    // TODO: Ganti ini dengan POST ke API jika endpoint simpan pesanan sudah dibuat di backend
-    alert(`Berhasil! Tenda ${selectedTent} di-booking untuk ${calculateNights()} malam.`);
+    const newOrder = {
+      id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`, 
+      paket: selectedPackage?.nama,
+      tenda: selectedTent,
+      checkIn: checkIn,
+      checkOut: checkOut,
+      total: selectedPackage?.harga * calculateNights(),
+      status: "menunggu_pembayaran"
+    };
+
+    const existingOrders = JSON.parse(localStorage.getItem('nenda_orders') || '[]');
+
+    existingOrders.unshift(newOrder);
+
+    localStorage.setItem('nenda_orders', JSON.stringify(existingOrders));
+
+    alert(`Berhasil! Tenda ${selectedTent} telah di-booking.`);
     router.push('/user/dashboard'); 
   };
 

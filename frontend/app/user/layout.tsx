@@ -10,7 +10,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
 
   const handleLogout = async () => {
     try {
-      // Panggil API Logout untuk memusnahkan Cookie JWT
       await fetch('http://localhost:6969/api/logout', { 
         method: 'POST',
         credentials: 'include' 
@@ -18,8 +17,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     } catch (err) {
       console.error('Logout error', err);
     }
-    
-    // Hapus sesi lokal dan arahkan kembali ke Homepage
     localStorage.removeItem('role');
     router.push('/');
   };
@@ -34,16 +31,16 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </Link>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-1">
-          <Link href="/user/dashboard" className="flex items-center gap-3 px-4 py-3 bg-emerald-600 rounded-xl text-white font-bold shadow-md transition-all">
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          <Link href="/user/dashboard" className="flex items-center gap-3 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold shadow-md transition-all">
             <LayoutDashboard size={18} /><span>Dashboard Saya</span>
           </Link>
-          <Link href="/#katalog" className="flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
+          <Link href="/user/book" className="flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
             <Tent size={18} /><span>Pesan Tenda Baru</span>
           </Link>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
+          <Link href="/user/dashboard" className="flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
             <Clock size={18} /><span>Riwayat Transaksi</span>
-          </button>
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-stone-800">
@@ -53,7 +50,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      {/* AREA KONTEN KANAN */}
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
         <header className="h-20 bg-white border-b border-stone-200 flex items-center justify-between px-8 sticky top-0 z-20">
           <div className="text-stone-500 font-medium text-sm">Dashboard Pelanggan</div>
