@@ -1,13 +1,38 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Tent, Users, CreditCard, LogOut, Bell, Settings } from 'lucide-react';
+import { LayoutDashboard, Tent, Users, CreditCard, LogOut, Bell, Settings, Loader } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname(); // Untuk mendeteksi halaman mana yang sedang aktif
+  const [authorized, setAuthorized] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('http://localhost:6969/api/user', {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const user = await res.json();
+          if (user && user.role === 'admin') {
+            setAuthorized(true);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+      }
+      localStorage.removeItem('role');
+      router.push('/login');
+    };
+    checkAuth();
+  }, [router]);
 
   const handleLogout = async () => {
     try {
@@ -20,12 +45,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const navLinks = [
-    { name: "Dashboard", href: "/admin/dashboard", icon: <LayoutDashboard size={18} /> },
-    { name: "Kelola Tenda", href: "/admin/tents", icon: <Tent size={18} /> },
-    { name: "Data Pelanggan", href: "#", icon: <Users size={18} /> },
-    { name: "Transaksi", href: "#", icon: <CreditCard size={18} /> },
-    { name: "Utilitas & Laporan", href: "/admin/utilities", icon: <Settings size={18} /> }
+    { name: "Status Tenda", href: "/admin/tents", icon: <Tent size={18} /> },
+    { name: "Data Pelanggan", href: "/admin/users", icon: <Users size={18} /> }
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-900 text-white flex-col gap-4">
+        <Loader className="animate-spin text-emerald-500" size={40} />
+        <p className="text-sm font-semibold tracking-wider uppercase text-stone-400">Memverifikasi Otoritas Admin...</p>
+      </div>
+    );
+  }
+
+  if (!authorized) return null;
 
   return (
     <div className="min-h-screen flex bg-stone-50 font-sans">

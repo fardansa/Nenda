@@ -110,34 +110,6 @@ def get_db_connection():
 # Base Directory of this script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# --- Pages serving routes ---
-
-@app.get("/", response_class=HTMLResponse)
-def get_login_page(request: Request):
-    token = request.cookies.get("session_token")
-    if token:
-        payload = decode_access_token(token)
-        if payload:
-            return RedirectResponse(url="/dashboard")
-            
-    with open(os.path.join(BASE_DIR, "login.html"), "r") as f:
-        return f.read()
-
-@app.get("/dashboard", response_class=HTMLResponse)
-def get_dashboard_page(request: Request):
-    token = request.cookies.get("session_token")
-    if not token:
-        return RedirectResponse(url="/")
-    
-    payload = decode_access_token(token)
-    if not payload:
-        response = RedirectResponse(url="/")
-        response.delete_cookie("session_token")
-        return response
-        
-    with open(os.path.join(BASE_DIR, "dashboard.html"), "r") as f:
-        return f.read()
-
 # --- API authentication routes ---
 
 @app.post("/api/register")
@@ -213,6 +185,20 @@ def logout(response: Response):
 
 # --- Dashboard helper APIs ---
 
+def get_admin_user(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+        
+    return payload
+
 @app.get("/api/user")
 def get_current_user(request: Request):
     token = request.cookies.get("session_token")
@@ -224,6 +210,69 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
         
     return payload
+
+@app.get("/api/admin/users")
+def get_admin_users(request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT user_id, nama, email, role, created_at FROM user ORDER BY user_id DESC")
+        users = cursor.fetchall()
+        for u in users:
+            if u.get("created_at") is not None:
+                u["created_at"] = str(u["created_at"])
+        return {"users": users}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.get("/api/admin/tents")
+def get_admin_tents(request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = """
+            SELECT t.tent_id, t.nomor_tent, t.nomor_loker, t.status, p.nama_paket, p.harga
+            FROM tent t
+            JOIN paket p ON t.paket_id = p.paket_id
+            ORDER BY t.tent_id ASC
+        """
+        cursor.execute(query)
+        tents = cursor.fetchall()
+        return {"tents": tents}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+class TentStatusUpdate(BaseModel):
+    status: str
+
+@app.post("/api/admin/tents/{tent_id}/status")
+def update_tent_status(tent_id: int, req: TentStatusUpdate, request: Request):
+    get_admin_user(request)
+    if req.status not in ["tersedia", "tidak tersedia"]:
+        raise HTTPException(status_code=400, detail="Invalid status value")
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "UPDATE tent SET status = %s WHERE tent_id = %s",
+            (req.status, tent_id)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Tent status updated successfully"}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @app.get("/api/tents")
 def get_tents_data():
