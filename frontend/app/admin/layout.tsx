@@ -46,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navLinks = [
     { name: "Status Tenda", href: "/admin/tents", icon: <Tent size={18} /> },
+    { name: "Verifikasi Pembayaran", href: "/admin/utilities", icon: <CreditCard size={18} /> },
     { name: "Data Pelanggan", href: "/admin/users", icon: <Users size={18} /> }
   ];
 

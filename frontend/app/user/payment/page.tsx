@@ -20,15 +20,37 @@ export default function PaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const savedOrders = JSON.parse(localStorage.getItem('nenda_orders') || '[]');
-    const pendingOrder = savedOrders.find((o: any) => o.status === 'menunggu_pembayaran');
-    
-    if (pendingOrder) {
-      setOrderToPay(pendingOrder);
-    } else {
-      alert("Tidak ada tagihan yang perlu dibayar saat ini.");
-      router.push('/user/dashboard');
-    }
+    const fetchPendingOrder = async () => {
+      try {
+        const res = await fetch('http://localhost:6969/api/bookings', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          const pending = data.bookings.find((b: any) => b.status_pemesanan === 'menunggu_pembayaran');
+          if (pending) {
+            setOrderToPay({
+              id: pending.pemesanan_id,
+              paket: pending.nama_paket.toUpperCase(),
+              tenda: pending.nomor_tent,
+              checkIn: pending.tanggal_checkin,
+              checkOut: pending.tanggal_checkout,
+              total: pending.total_harga,
+              status: pending.status_pemesanan
+            });
+          } else {
+            alert("Tidak ada tagihan yang perlu dibayar saat ini.");
+            router.push('/user/dashboard');
+          }
+        } else {
+          alert("Gagal menarik data booking.");
+          router.push('/user/dashboard');
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Gagal menghubungi server.");
+        router.push('/user/dashboard');
+      }
+    };
+    fetchPendingOrder();
   }, [router]);
 
   const handleCopy = () => {
@@ -42,26 +64,35 @@ export default function PaymentPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return alert("Silakan unggah bukti transfer terlebih dahulu!");
     
     setIsSubmitting(true);
     
-    // Prosedur upload & update database (localStorage)
-    setTimeout(() => {
-      const savedOrders = JSON.parse(localStorage.getItem('nenda_orders') || '[]');
-      
-      const updatedOrders = savedOrders.map((o: any) => 
-        o.id === orderToPay.id ? { ...o, status: 'menunggu_verifikasi' } : o
-      );
-      
-      localStorage.setItem('nenda_orders', JSON.stringify(updatedOrders));
-      
+    try {
+      const formData = new FormData();
+      formData.append('bukti_tf', file);
+
+      const res = await fetch(`http://localhost:6969/api/bookings/${orderToPay.id}/payment`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        alert("Pesanan Telah Dibayar! Bukti berhasil diunggah dan sedang menunggu verifikasi Admin.");
+        router.push('/user/dashboard');
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || "Gagal mengunggah bukti pembayaran.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan koneksi saat mengunggah bukti pembayaran.");
+    } finally {
       setIsSubmitting(false);
-      alert("Pesanan Telah Dibayar! Bukti berhasil diunggah dan sedang menunggu verifikasi Admin.");
-      router.push('/user/dashboard');
-    }, 1500);
+    }
   };
 
   const formatRupiah = (price: number) => {

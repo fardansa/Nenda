@@ -1,25 +1,115 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, Filter, CheckCircle, XCircle, Eye, Receipt, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, CheckCircle, XCircle, Eye, Receipt, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function UtilitiesPage() {
-  // Simulasi data antrean verifikasi pembayaran dari database
-  const [payments, setPayments] = useState([
-    { id: "INV-001", user: "Dipta", paket: "Luxury Tent", nominal: "Rp 750.000", metode: "Transfer BCA", tanggal: "12 Jun 2026", status: "Menunggu Validasi" },
-    { id: "INV-002", user: "Rafly", paket: "Campfire Feast", nominal: "Rp 400.000", metode: "QRIS", tanggal: "12 Jun 2026", status: "Menunggu Validasi" },
-    { id: "INV-003", user: "Dayu", paket: "Lakeside Retreat", nominal: "Rp 600.000", metode: "Transfer Mandiri", tanggal: "11 Jun 2026", status: "Dikonfirmasi" },
-    { id: "INV-004", user: "Ridwan", paket: "Guided Adventure", nominal: "Rp 350.000", metode: "Belum Bayar", tanggal: "-", status: "Belum Bayar" },
-  ]);
-
+  const [payments, setPayments] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('Menunggu Validasi');
+  const [loading, setLoading] = useState(true);
 
-  const handleConfirm = (id: string) => {
-    setPayments(payments.map(p => p.id === id ? { ...p, status: "Dikonfirmasi" } : p));
+  const formatRupiah = (price: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
   };
 
-  const handleReject = (id: string) => {
-    setPayments(payments.map(p => p.id === id ? { ...p, status: "Dibatalkan" } : p));
+  const fetchPayments = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:6969/api/admin/bookings', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.bookings.map((b: any) => {
+          let uiStatus = "Belum Bayar";
+          if (b.status_pemesanan === 'menunggu_konfirmasi') {
+            uiStatus = "Menunggu Validasi";
+          } else if (b.status_pemesanan === 'telah_dibayar') {
+            uiStatus = "Dikonfirmasi";
+          } else if (b.status_pemesanan === 'dibatalkan') {
+            uiStatus = "Dibatalkan";
+          }
+          
+          return {
+            id: b.pemesanan_id,
+            user: b.user_nama,
+            paket: `${b.nama_paket.toUpperCase()} TENT (Posisi: ${b.nomor_tent})`,
+            nominal: formatRupiah(b.total_harga),
+            metode: "Transfer Bank",
+            tanggal: b.tanggal_pembayaran ? new Date(b.tanggal_pembayaran).toLocaleString('id-ID') : new Date(b.created_at).toLocaleString('id-ID'),
+            status: uiStatus,
+            bukti_tf: b.bukti_tf
+          };
+        });
+        setPayments(mapped);
+      }
+    } catch (err) {
+      console.error("Gagal memuat pembayaran admin:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
+
+  const handleConfirm = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:6969/api/admin/bookings/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'telah_dibayar' }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Pembayaran berhasil dikonfirmasi!");
+        fetchPayments();
+      } else {
+        alert("Gagal mengonfirmasi pembayaran.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:6969/api/admin/bookings/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dibatalkan' }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Pembayaran berhasil ditolak!");
+        fetchPayments();
+      } else {
+        alert("Gagal menolak pembayaran.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCancelOrder = async (id: number) => {
+    const confirmCancel = window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini secara manual?");
+    if (!confirmCancel) return;
+    
+    try {
+      const res = await fetch(`http://localhost:6969/api/admin/bookings/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dibatalkan' }),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Pesanan berhasil dibatalkan secara manual!");
+        fetchPayments();
+      } else {
+        alert("Gagal membatalkan pesanan.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const filteredPayments = payments.filter(p => p.status === activeTab);
@@ -32,20 +122,28 @@ export default function UtilitiesPage() {
           <h1 className="text-3xl font-extrabold text-stone-800 tracking-tight">Validasi Pembayaran</h1>
           <p className="text-stone-500 text-sm mt-1">Utilitas untuk memeriksa bukti transfer dan mengonfirmasi reservasi tenda.</p>
         </div>
-        <div className="flex bg-white rounded-xl border border-stone-200 p-1 shadow-sm">
-          {['Menunggu Validasi', 'Dikonfirmasi', 'Belum Bayar'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
-                activeTab === tab 
-                  ? 'bg-emerald-100 text-emerald-700 shadow-sm' 
-                  : 'text-stone-500 hover:text-stone-700 hover:bg-stone-50'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+          <div className="flex bg-white rounded-xl border border-stone-200 p-1 shadow-sm">
+            {['Menunggu Validasi', 'Dikonfirmasi', 'Belum Bayar'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                  activeTab === tab 
+                    ? 'bg-emerald-100 text-emerald-700 shadow-sm' 
+                    : 'text-stone-500 hover:text-stone-700 hover:bg-stone-50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={fetchPayments}
+            className="bg-stone-900 hover:bg-stone-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh Data
+          </button>
         </div>
       </div>
 
@@ -94,12 +192,17 @@ export default function UtilitiesPage() {
                       <p className="text-xs text-stone-400 mt-0.5">{pay.tanggal}</p>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      {pay.status === 'Belum Bayar' ? (
+                      {!pay.bukti_tf ? (
                         <span className="text-xs text-stone-400 italic">Belum ada</span>
                       ) : (
-                        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition mx-auto">
+                        <a 
+                          href={`http://localhost:6969/upload/${pay.bukti_tf}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition mx-auto"
+                        >
                           <Receipt size={14} /> Lihat Bukti
-                        </button>
+                        </a>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -120,13 +223,31 @@ export default function UtilitiesPage() {
                           </button>
                         </div>
                       ) : pay.status === "Dikonfirmasi" ? (
-                        <span className="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-bold bg-emerald-50 px-3 py-1.5 rounded-lg">
-                          <CheckCircle size={14} /> Sah
-                        </span>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="inline-flex items-center gap-1.5 text-emerald-600 text-xs font-bold bg-emerald-50 px-3 py-1.5 rounded-lg animate-in fade-in duration-300">
+                            <CheckCircle size={14} /> Sah
+                          </span>
+                          <button 
+                            onClick={() => handleCancelOrder(pay.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold transition duration-300 cursor-pointer"
+                            title="Batalkan Pesanan Secara Manual"
+                          >
+                            <XCircle size={14} /> Batalkan
+                          </button>
+                        </div>
                       ) : (
-                         <span className="inline-flex items-center gap-1.5 text-orange-500 text-xs font-bold bg-orange-50 px-3 py-1.5 rounded-lg">
-                          <AlertCircle size={14} /> Menunggu User
-                        </span>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="inline-flex items-center gap-1.5 text-orange-500 text-xs font-bold bg-orange-50 px-3 py-1.5 rounded-lg">
+                            <AlertCircle size={14} /> Menunggu User
+                          </span>
+                          <button 
+                            onClick={() => handleCancelOrder(pay.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold transition duration-300 cursor-pointer"
+                            title="Batalkan Pesanan Secara Manual"
+                          >
+                            <XCircle size={14} /> Batalkan
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

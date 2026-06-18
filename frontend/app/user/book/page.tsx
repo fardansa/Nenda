@@ -64,14 +64,26 @@ export default function BookingPage() {
     }
     return tents;
   };
-
   useEffect(() => {
-    if (selectedPackage && checkIn) {
-      const tents = generateTents();
-      // Simulasi tenda penuh karena API backend belum punya pengecekan tanggal
-      const randomBooked = tents.filter(() => Math.random() < 0.3);
-      setBookedTents(randomBooked);
+    const fetchBookedTents = async () => {
+      try {
+        const res = await fetch(`http://localhost:6969/api/tents/booked?check_in=${checkIn}&check_out=${checkOut}&paket_id=${selectedPackage.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBookedTents(data.booked_tents);
+        } else {
+          console.error("Gagal menarik data tenda terbooking");
+        }
+      } catch (err) {
+        console.error("Gagal menghubungi server backend:", err);
+      }
       setSelectedTent(null);
+    };
+
+    if (selectedPackage && checkIn && checkOut) {
+      fetchBookedTents();
+    } else {
+      setBookedTents([]);
     }
   }, [selectedPackage, checkIn, checkOut]);
 
@@ -83,27 +95,35 @@ export default function BookingPage() {
     if (step < 4) setStep(step + 1);
   };
 
-  const handleSubmit = () => {
-    const newOrder = {
-      id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`, 
-      paket: selectedPackage?.nama,
-      tenda: selectedTent,
-      checkIn: checkIn,
-      checkOut: checkOut,
-      total: selectedPackage?.harga * calculateNights(),
-      status: "menunggu_pembayaran"
-    };
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch('http://localhost:6969/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          check_in: checkIn,
+          check_out: checkOut,
+          paket_id: selectedPackage?.id,
+          nomor_tent: selectedTent,
+          total_harga: selectedPackage?.harga * calculateNights()
+        }),
+        credentials: 'include'
+      });
 
-    const existingOrders = JSON.parse(localStorage.getItem('nenda_orders') || '[]');
-
-    existingOrders.unshift(newOrder);
-
-    localStorage.setItem('nenda_orders', JSON.stringify(existingOrders));
-
-    alert(`Berhasil! Tenda ${selectedTent} telah di-booking.`);
-    router.push('/user/dashboard'); 
+      if (response.ok) {
+        alert(`Berhasil! Tenda ${selectedTent} telah di-booking.`);
+        router.push('/user/dashboard');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.detail || "Gagal membuat booking tenda.");
+      }
+    } catch (error) {
+      console.error("Gagal menghubungi server:", error);
+      alert("Terjadi kesalahan jaringan atau server backend belum menyala.");
+    }
   };
-
   const formatRupiah = (price: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
   };

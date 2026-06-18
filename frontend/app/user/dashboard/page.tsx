@@ -10,8 +10,29 @@ export default function UserDashboardPage() {
   const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
-    const savedOrders = JSON.parse(localStorage.getItem('nenda_orders') || '[]');
-    setOrders(savedOrders);
+    const fetchOrders = async () => {
+      try {
+        const res = await fetch('http://localhost:6969/api/bookings', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          const mappedOrders = data.bookings.map((b: any) => ({
+            id: b.pemesanan_id,
+            paket: b.nama_paket.toUpperCase(),
+            tenda: b.nomor_tent,
+            checkIn: b.tanggal_checkin,
+            checkOut: b.tanggal_checkout,
+            total: b.total_harga,
+            status: b.status_pemesanan === 'menunggu_konfirmasi' ? 'menunggu_verifikasi' : b.status_pemesanan
+          }));
+          setOrders(mappedOrders);
+        } else {
+          console.error("Gagal menarik data booking");
+        }
+      } catch (err) {
+        console.error("Gagal menghubungi server:", err);
+      }
+    };
+    fetchOrders();
   }, []);
 
   const formatRupiah = (price: number) => {
@@ -95,13 +116,17 @@ export default function UserDashboardPage() {
                     <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
                       order.status === 'telah_dibayar' ? 'bg-emerald-100 text-emerald-700' : 
                       order.status === 'menunggu_verifikasi' ? 'bg-blue-100 text-blue-700' :
+                      order.status === 'expired' ? 'bg-red-100 text-red-700' :
+                      order.status === 'dibatalkan' ? 'bg-stone-200 text-stone-700' :
                       'bg-orange-100 text-orange-700'
                     }`}>
                       {order.status === 'telah_dibayar' ? <CheckCircle2 size={14}/> : 
                        order.status === 'menunggu_verifikasi' ? <Search size={14}/> : <Clock size={14}/>}
                       
                       {order.status === 'menunggu_pembayaran' ? 'Menunggu Pembayaran' : 
-                       order.status === 'menunggu_verifikasi' ? 'Menunggu Verifikasi' : 'Lunas'}
+                       order.status === 'menunggu_verifikasi' ? 'Menunggu Verifikasi' : 
+                       order.status === 'expired' ? 'Expired' : 
+                       order.status === 'dibatalkan' ? 'Dibatalkan' : 'Lunas'}
                     </span>
                   </div>
                   

@@ -8,8 +8,6 @@ export default function ManageTentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("semua");
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
-
   const fetchTents = async () => {
     setLoading(true);
     try {
@@ -32,31 +30,6 @@ export default function ManageTentsPage() {
   useEffect(() => {
     fetchTents();
   }, []);
-
-  const toggleStatus = async (tentId: number, currentStatus: string) => {
-    const nextStatus = currentStatus === 'tersedia' ? 'tidak tersedia' : 'tersedia';
-    setUpdatingId(tentId);
-    try {
-      const res = await fetch(`http://localhost:6969/api/admin/tents/${tentId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
-        credentials: 'include'
-      });
-      if (res.ok) {
-        setTents(prev =>
-          prev.map(t => t.tent_id === tentId ? { ...t, status: nextStatus } : t)
-        );
-      } else {
-        alert("Gagal mengubah status tenda.");
-      }
-    } catch (err) {
-      console.error("Error updating tent status:", err);
-      alert("Terjadi kesalahan jaringan.");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
 
   const formatRupiah = (price: number) => {
     return new Intl.NumberFormat('id-ID', { 
@@ -131,13 +104,12 @@ export default function ManageTentsPage() {
                 <th className="px-6 py-4">Nama Paket</th>
                 <th className="px-6 py-4">Harga / Malam</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-stone-700">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-stone-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-stone-500">
                     <div className="flex flex-col items-center justify-center">
                       <RefreshCw className="animate-spin text-emerald-500 mb-3" size={32} />
                       <p className="font-medium">Memuat data tenda...</p>
@@ -159,24 +131,11 @@ export default function ManageTentsPage() {
                         {tent.status === 'tersedia' ? 'Tersedia' : 'Tidak Tersedia'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => toggleStatus(tent.tent_id, tent.status)}
-                        disabled={updatingId === tent.tent_id}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-200 cursor-pointer disabled:opacity-50 ${
-                          tent.status === 'tersedia' 
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100' 
-                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {updatingId === tent.tent_id ? 'Memproses...' : tent.status === 'tersedia' ? 'Set Tidak Tersedia' : 'Set Tersedia'}
-                      </button>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-stone-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-stone-500">
                     <p className="font-medium">Tidak ada data tenda yang cocok.</p>
                   </td>
                 </tr>
