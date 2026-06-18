@@ -53,7 +53,7 @@ export default function HomePage() {
     if (status !== 'Tersedia') return;
     
     if (role) {
-      router.push('/user/dashboard');
+      router.push('/user/book'); 
     } else {
       router.push('/login');
     }
