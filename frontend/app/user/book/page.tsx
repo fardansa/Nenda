@@ -49,7 +49,7 @@ export default function BookingPage() {
             nama: p.nama_paket.toUpperCase(), 
             harga: p.harga,
             kapasitas: p.kapasitas,
-            prefix: p.nama_paket.charAt(0).toUpperCase() // 's' -> 'S', 'd' -> 'D', 'f' -> 'F'
+            prefix: p.nama_paket.charAt(0).toUpperCase() 
           }));
           setPackagesDB(formattedPackages);
         }
@@ -62,7 +62,7 @@ export default function BookingPage() {
     fetchPackages();
   }, []);
 
-  // Cek Ketersediaan Tenda dari Database berdasarkan Tanggal & Paket
+  // Cek Ketersediaan Tenda
   useEffect(() => {
     if (selectedPackage && checkIn && checkOut) {
       const fetchAvailability = async () => {
@@ -222,7 +222,6 @@ export default function BookingPage() {
                 </div>
               </div>
 
-              {/* Gambar */}
               <div className="relative w-full overflow-hidden rounded-3xl border-4 border-stone-200 shadow-inner bg-stone-900" style={{ aspectRatio: '16/10' }}>
                 <img 
                   src="/denah.jpg" 
@@ -230,7 +229,7 @@ export default function BookingPage() {
                   className="absolute inset-0 w-full h-full object-cover opacity-90"
                 />
 
-                {/* LOOPING MARKER/TOMBOL */}
+                {/* MARKER/TOMBOL */}
                 {tentCoordinates.map((tanda) => {
                   const isCurrentPackage = selectedPackage?.prefix === tanda.id.charAt(0);
                   const isBooked = bookedTents.includes(tanda.id);
@@ -307,7 +306,7 @@ export default function BookingPage() {
 
         </div>
 
-        {/* NAVIGATION BUTTONS */}
+        {/* NAV BUTTONS */}
         <div className="mt-8 flex justify-between">
           <button 
             onClick={() => step > 1 ? setStep(step - 1) : router.push('/user/dashboard')}
