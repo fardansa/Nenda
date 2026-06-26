@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Tent, MapPin, CalendarClock, ArrowRight, Clock, CheckCircle2, FileText, CreditCard, Search } from 'lucide-react';
+import Swal from "sweetalert2";
 
 export default function UserDashboardPage() {
   const router = useRouter();
@@ -47,12 +48,14 @@ export default function UserDashboardPage() {
             {orders.length > 0 && orders[0].status_pemesanan === 'menunggu_pembayaran' ? 'Menunggu Pembayaran' : 
              orders.length > 0 && orders[0].status_pemesanan === 'menunggu_konfirmasi' ? 'Sedang Diverifikasi Admin' :
              orders.length > 0 && orders[0].status_pemesanan === 'telah_dibayar' ? 'Perkemahan Terjadwal' : 
+             orders.length > 0 && (orders[0].status_pemesanan === 'dibatalkan' || orders[0].status_pemesanan === 'expired') ? 'Pesanan Tidak Aktif' :
              'Belum Ada Perkemahan Terjadwal'}
           </h2>
           <p className="text-emerald-100 max-w-md">
             {orders.length > 0 && orders[0].status_pemesanan === 'menunggu_pembayaran' ? `Segera selesaikan pembayaran untuk mengamankan tenda ${orders[0].nomor_tent}.` : 
              orders.length > 0 && orders[0].status_pemesanan === 'menunggu_konfirmasi' ? `Bukti pembayaran tenda ${orders[0].nomor_tent} sudah diterima. Admin akan segera memverifikasinya.` :
              orders.length > 0 && orders[0].status_pemesanan === 'telah_dibayar' ? `Tenda ${orders[0].nomor_tent} sudah siap! Jangan lupa bawa perlengkapan pribadi.` :
+             orders.length > 0 && (orders[0].status_pemesanan === 'dibatalkan' || orders[0].status_pemesanan === 'expired') ? 'Pesanan ini tidak berhasil diproses. Silakan buat pesanan baru.' :
             'Kamu belum memiliki reservasi tenda yang aktif. Yuk, rencanakan liburanmu!'}
           </p>
         </div>
@@ -89,13 +92,16 @@ export default function UserDashboardPage() {
                     <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
                       order.status_pemesanan === 'telah_dibayar' ? 'bg-emerald-100 text-emerald-700' : 
                       order.status_pemesanan === 'menunggu_konfirmasi' ? 'bg-blue-100 text-blue-700' :
+                      (order.status_pemesanan === 'dibatalkan' || order.status_pemesanan === 'expired') ? 'bg-red-100 text-red-700' :
                       'bg-orange-100 text-orange-700'
                     }`}>
                       {order.status_pemesanan === 'telah_dibayar' ? <CheckCircle2 size={14}/> : 
                        order.status_pemesanan === 'menunggu_konfirmasi' ? <Search size={14}/> : <Clock size={14}/>}
                       
                       {order.status_pemesanan === 'menunggu_pembayaran' ? 'Menunggu Pembayaran' : 
-                       order.status_pemesanan === 'menunggu_konfirmasi' ? 'Menunggu Verifikasi' : 'Lunas'}
+                       order.status_pemesanan === 'menunggu_konfirmasi' ? 'Menunggu Verifikasi' : 
+                       order.status_pemesanan === 'dibatalkan' ? 'Dibatalkan' : 
+                       order.status_pemesanan === 'expired' ? 'Kadaluarsa' : 'Lunas'}
                     </span>
                   </div>
                   
@@ -114,12 +120,56 @@ export default function UserDashboardPage() {
                   </div>
                   
                   {order.status_pemesanan === 'menunggu_pembayaran' && (
-                    <button 
-                      onClick={() => router.push(`/user/payment`)}
-                      className="w-full md:w-auto bg-stone-900 hover:bg-stone-800 text-white px-6 py-2.5 rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <CreditCard size={16} /> Bayar Sekarang
-                    </button>
+                    <div className="flex flex-col gap-2 w-full md:w-auto">
+                      {/* Tombol Bayar Sekarang */}
+                      <button 
+                        onClick={() =>
+                          router.push(`/user/payment?pemesanan_id=${order.pemesanan_id}`)
+                        }
+                        className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-800 text-white px-6 py-2.5 rounded-xl font-bold shadow-md transition flex items-center justify-center gap-2 text-sm"
+                      >
+                        <CreditCard size={16} /> Bayar Sekarang
+                      </button>
+
+                    
+                      <button 
+                        onClick={async () => {
+                          const result = await Swal.fire({
+                            title: 'Batalkan Pesanan?',
+                            text: "Pesanan ini akan dibatalkan dan tidak bisa dikembalikan.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#e11d48',
+                            cancelButtonColor: '#a8a29e',
+                            confirmButtonText: 'Ya, Batalkan!',
+                            cancelButtonText: 'Tidak'
+                          });
+
+                          if (result.isConfirmed) {
+                            try {
+                              const res = await fetch(`http://localhost:6969/api/bookings/${order.pemesanan_id}/cancel`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include' 
+                              });
+                              
+                              if (res.ok) {
+                                Swal.fire('Berhasil!', 'Pesanan telah dibatalkan.', 'success');
+                                window.location.reload(); 
+                              } else {
+                                const errorData = await res.json();
+                                Swal.fire('Gagal!', errorData.detail || "Gagal membatalkan pesanan.", 'error');
+                              }
+                            } catch (err) {
+                              Swal.fire('Error!', "Terjadi kesalahan koneksi.", 'error');
+                            }
+                          }
+                        }}
+                        className="w-full md:w-auto bg-red-400 hover:bg-red-500 text-white px-6 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 text-sm border border-red-100"
+                      >
+                        Batalkan Pesanan
+                      </button>
+                    </div>
                   )}
                   {order.status_pemesanan === 'menunggu_konfirmasi' && (
                     <p className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg text-center w-full md:w-auto">

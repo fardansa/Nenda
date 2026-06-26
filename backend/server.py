@@ -310,29 +310,36 @@ def get_tents_data():
 # --- New Booking and Availability APIs ---
 
 @app.get("/api/tents/booked")
-def get_booked_tents(check_in: str, check_out: str, paket_id: int):
-    # Retrieve all tent numbers (nomor_tent) that are unavailable during the timespan
+def get_booked_tents(check_in: str, check_out: str, paket_id: Optional[int] = None):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        query = """
+        # Base query disederhanakan menggunakan expired_at
+        base_query = """
             SELECT t.nomor_tent FROM tent t
-            WHERE t.paket_id = %s AND (
-                t.status = 'tidak tersedia'
-                OR t.tent_id IN (
-                    SELECT dp.tent_id 
-                    FROM detail_pemesanan dp
-                    JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
-                    WHERE pm.status_pemesanan IN ('menunggu_pembayaran', 'menunggu_konfirmasi', 'telah_dibayar')
-                      AND pm.tanggal_checkin < %s 
-                      AND pm.tanggal_checkout > %s
-                )
-            )
+            WHERE (t.status = 'tidak tersedia')
+               OR t.tent_id IN (
+                   SELECT dp.tent_id 
+                   FROM detail_pemesanan dp
+                   JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
+                   WHERE (
+                        pm.status_pemesanan IN ('telah_dibayar', 'menunggu_konfirmasi')
+                        OR (pm.status_pemesanan = 'menunggu_pembayaran' AND pm.expired_at > NOW())
+                   )
+                   AND pm.tanggal_checkin < %s
+                   AND pm.tanggal_checkout > %s
+               )
         """
-        cursor.execute(query, (paket_id, check_out, check_in))
+        
+        if paket_id is not None:
+            # Inject pengecekan paket_id ke base_query
+            query = base_query.replace("WHERE (t.status", "WHERE t.paket_id = %s AND (t.status")
+            cursor.execute(query, (paket_id, check_out, check_in))
+        else:
+            cursor.execute(base_query, (check_out, check_in))
+            
         rows = cursor.fetchall()
-        booked_tents = [r["nomor_tent"] for r in rows]
-        return {"booked_tents": booked_tents}
+        return {"booked_tents": [r["nomor_tent"] for r in rows]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -353,16 +360,20 @@ def check_tent_availability(tent_id: int, check_in: str, check_out: str):
         if tent["status"] == "tidak tersedia":
             return {"available": False, "reason": "out_of_service"}
         
-        # Check active bookings
+        # BAGIAN YANG DIEDIT: Memperbaiki logika status_pemesanan
         query = """
             SELECT 1 FROM detail_pemesanan dp
             JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
             WHERE dp.tent_id = %s 
-              AND pm.status_pemesanan IN ('menunggu_pembayaran', 'menunggu_konfirmasi', 'telah_dibayar')
+              AND (
+                  pm.status_pemesanan IN ('menunggu_konfirmasi', 'telah_dibayar')
+                  OR (pm.status_pemesanan = 'menunggu_pembayaran' AND pm.expired_at > NOW())
+              )
               AND pm.tanggal_checkin < %s 
               AND pm.tanggal_checkout > %s
         """
         cursor.execute(query, (tent_id, check_out, check_in))
+        
         if cursor.fetchone():
             return {"available": False, "reason": "booked"}
         return {"available": True}
@@ -372,12 +383,52 @@ def check_tent_availability(tent_id: int, check_in: str, check_out: str):
         cursor.close()
         conn.close()
 
+@app.post("/api/bookings/{pemesanan_id}/cancel")
+def cancel_booking_user(pemesanan_id: int, request: Request):
+    # 1. Pastikan user login
+    user = get_current_user(request)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 2. Cek apakah pesanan milik user ini dan statusnya masih menunggu pembayaran
+        cursor.execute(
+            "SELECT status_pemesanan FROM pemesanan_master WHERE pemesanan_id = %s AND user_id = %s", 
+            (pemesanan_id, user["user_id"])
+        )
+        booking = cursor.fetchone()
+        
+        if not booking:
+            raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan atau bukan milik Anda")
+        
+        if booking["status_pemesanan"] != "menunggu_pembayaran":
+            raise HTTPException(status_code=400, detail="Hanya pesanan yang menunggu pembayaran yang bisa dibatalkan")
+            
+        # 3. Update status jadi 'dibatalkan'
+        cursor.execute(
+            "UPDATE pemesanan_master SET status_pemesanan = 'dibatalkan' WHERE pemesanan_id = %s", 
+            (pemesanan_id,)
+        )
+        
+        conn.commit()
+        return {"status": "success", "message": "Pesanan berhasil dibatalkan"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        conn.close()
+
+
+class BookingItem(BaseModel):
+    paket_id: int
+    nomor_tent: str
+
 
 class BookingCreateRequest(BaseModel):
     check_in: str
     check_out: str
-    paket_id: int
-    nomor_tent: str
+    items: list[BookingItem]
     total_harga: int
 
 
@@ -387,60 +438,78 @@ def create_booking(req: BookingCreateRequest, request: Request):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        # Find tent_id
-        cursor.execute(
-            "SELECT tent_id, status FROM tent WHERE nomor_tent = %s AND paket_id = %s",
-            (req.nomor_tent, req.paket_id)
-        )
-        tent = cursor.fetchone()
-        if not tent:
-            raise HTTPException(status_code=404, detail="Tent not found")
-        if tent["status"] == "tidak tersedia":
-            raise HTTPException(status_code=400, detail="Tent is currently out of service")
-        
-        # Check if already booked for these dates
-        check_query = """
-            SELECT 1 FROM detail_pemesanan dp
-            JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
-            WHERE dp.tent_id = %s 
-              AND pm.status_pemesanan IN ('menunggu_pembayaran', 'menunggu_konfirmasi', 'telah_dibayar')
-              AND pm.tanggal_checkin < %s 
-              AND pm.tanggal_checkout > %s
-        """
-        cursor.execute(check_query, (tent["tent_id"], req.check_out, req.check_in))
-        if cursor.fetchone():
-            raise HTTPException(status_code=400, detail="Tent is already booked for these dates")
-        
-        # Find package price
-        cursor.execute("SELECT harga FROM paket WHERE paket_id = %s", (req.paket_id,))
-        paket = cursor.fetchone()
-        if not paket:
-            raise HTTPException(status_code=404, detail="Package not found")
-        
-        # Create master booking
+        # Validate all requested items first
+        valid_items = []
+        for item in req.items:
+            # Find tent_id
+            cursor.execute(
+                "SELECT tent_id, status FROM tent WHERE nomor_tent = %s AND paket_id = %s",
+                (item.nomor_tent, item.paket_id)
+            )
+            tent = cursor.fetchone()
+            if not tent:
+                raise HTTPException(status_code=404, detail=f"Tenda {item.nomor_tent} tidak ditemukan")
+            if tent["status"] == "tidak tersedia":
+                raise HTTPException(status_code=400, detail=f"Tenda {item.nomor_tent} sedang tidak tersedia/out of service")
+            
+            # BAGIAN YANG DIEDIT 1: Pengecekan overlap jadwal (check_query)
+            check_query = """
+                SELECT 1 FROM detail_pemesanan dp
+                JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
+                WHERE dp.tent_id = %s 
+                  AND (
+                      pm.status_pemesanan IN ('menunggu_konfirmasi', 'telah_dibayar')
+                      OR (pm.status_pemesanan = 'menunggu_pembayaran' AND pm.expired_at > NOW())
+                  )
+                  AND pm.tanggal_checkin < %s 
+                  AND pm.tanggal_checkout > %s
+            """
+            cursor.execute(check_query, (tent["tent_id"], req.check_out, req.check_in))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail=f"Tenda {item.nomor_tent} sudah dipesan untuk tanggal tersebut")
+            
+            # Find package price
+            cursor.execute("SELECT harga FROM paket WHERE paket_id = %s", (item.paket_id,))
+            paket = cursor.fetchone()
+            if not paket:
+                raise HTTPException(status_code=404, detail=f"Paket {item.paket_id} tidak ditemukan")
+            
+            valid_items.append({
+                "tent_id": tent["tent_id"],
+                "nomor_tent": item.nomor_tent,
+                "harga": paket["harga"]
+            })
+
+        if not valid_items:
+            raise HTTPException(status_code=400, detail=f"Tidak ada item tenda yang dipilih")
+
+        # BAGIAN YANG DIEDIT 2: Create master booking (Ubah 1 MINUTE jadi 30 MINUTE)
         cursor.execute(
             """
             INSERT INTO pemesanan_master (user_id, tanggal_checkin, tanggal_checkout, total_harga, status_pemesanan, expired_at)
-            VALUES (%s, %s, %s, %s, 'menunggu_pembayaran', DATE_ADD(NOW(), INTERVAL 24 HOUR))
+            VALUES (%s, %s, %s, %s, 'menunggu_pembayaran', DATE_ADD(NOW(), INTERVAL 30 MINUTE))
             """,
             (user["user_id"], req.check_in, req.check_out, req.total_harga)
         )
         pemesanan_id = cursor.lastrowid
         
-        # Create booking detail
-        cursor.execute(
-            """
-            INSERT INTO detail_pemesanan (pemesanan_id, tent_id, harga_per_malam, subtotal)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (pemesanan_id, tent["tent_id"], paket["harga"], req.total_harga)
-        )
+        # Calculate nights
+        from datetime import datetime
+        start_date = datetime.strptime(req.check_in, "%Y-%m-%d")
+        end_date = datetime.strptime(req.check_out, "%Y-%m-%d")
+        nights = max(1, (end_date - start_date).days)
 
-        # Update tent status to 'tidak tersedia' in database
-        cursor.execute(
-            "UPDATE tent SET status = 'tidak tersedia' WHERE tent_id = %s",
-            (tent["tent_id"],)
-        )
+        # Create booking details and update tent status
+        for item in valid_items:
+            item_subtotal = item["harga"] * nights
+            cursor.execute(
+                """
+                INSERT INTO detail_pemesanan (pemesanan_id, tent_id, harga_per_malam, subtotal)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (pemesanan_id, item["tent_id"], item["harga"], item_subtotal)
+            )
+            
         conn.commit()
         return {"status": "success", "pemesanan_id": pemesanan_id}
     except HTTPException as he:
@@ -461,12 +530,14 @@ def get_user_bookings(request: Request):
     try:
         query = """
             SELECT pm.pemesanan_id, pm.tanggal_checkin, pm.tanggal_checkout, pm.total_harga, pm.status_pemesanan,
-                   p.nama_paket, t.nomor_tent
+                   GROUP_CONCAT(DISTINCT p.nama_paket SEPARATOR ', ') AS nama_paket,
+                   GROUP_CONCAT(t.nomor_tent ORDER BY t.nomor_tent SEPARATOR ', ') AS nomor_tent
             FROM pemesanan_master pm
             JOIN detail_pemesanan dp ON pm.pemesanan_id = dp.pemesanan_id
             JOIN tent t ON dp.tent_id = t.tent_id
             JOIN paket p ON t.paket_id = p.paket_id
             WHERE pm.user_id = %s
+            GROUP BY pm.pemesanan_id
             ORDER BY pm.pemesanan_id DESC
         """
         cursor.execute(query, (user["user_id"],))
@@ -517,8 +588,12 @@ async def upload_payment_proof(
         content = await bukti_tf.read()
         with open(filepath, "wb") as f:
             f.write(content)
-            
+        
+
+
         # Update/Insert pembayaran table
+        cursor.execute("SHOW COLUMNS FROM pembayaran")
+        print(cursor.fetchall())
         cursor.execute("SELECT pembayaran_id FROM pembayaran WHERE pemesanan_id = %s", (pemesanan_id,))
         existing_pay = cursor.fetchone()
         if existing_pay:
@@ -565,7 +640,9 @@ def get_admin_bookings(request: Request):
     try:
         query = """
             SELECT pm.pemesanan_id, pm.tanggal_checkin, pm.tanggal_checkout, pm.total_harga, pm.status_pemesanan, pm.created_at,
-                   u.nama AS user_nama, p.nama_paket, t.nomor_tent,
+                   u.nama AS user_nama, 
+                   GROUP_CONCAT(DISTINCT p.nama_paket SEPARATOR ', ') AS nama_paket,
+                   GROUP_CONCAT(t.nomor_tent ORDER BY t.nomor_tent SEPARATOR ', ') AS nomor_tent,
                    pay.pembayaran_id, pay.bukti_tf, pay.status_pembayaran, pay.tanggal_pembayaran
             FROM pemesanan_master pm
             JOIN user u ON pm.user_id = u.user_id
@@ -573,6 +650,7 @@ def get_admin_bookings(request: Request):
             JOIN tent t ON dp.tent_id = t.tent_id
             JOIN paket p ON t.paket_id = p.paket_id
             LEFT JOIN pembayaran pay ON pm.pemesanan_id = pay.pemesanan_id
+            GROUP BY pm.pemesanan_id, pay.pembayaran_id, pay.bukti_tf, pay.status_pembayaran, pay.tanggal_pembayaran
             ORDER BY pm.pemesanan_id DESC
         """
         cursor.execute(query)
@@ -632,15 +710,6 @@ def update_booking_status(pemesanan_id: int, req: BookingStatusUpdateRequest, re
                     """,
                     (pemesanan_id, booking["total_harga"], pay_status)
                 )
-                
-        if req.status == "dibatalkan":
-            cursor.execute("SELECT tent_id FROM detail_pemesanan WHERE pemesanan_id = %s", (pemesanan_id,))
-            detail = cursor.fetchone()
-            if detail:
-                cursor.execute(
-                    "UPDATE tent SET status = 'tersedia' WHERE tent_id = %s",
-                    (detail["tent_id"],)
-                )
 
         conn.commit()
         return {"status": "success", "message": f"Booking status updated to {req.status}"}
@@ -651,7 +720,6 @@ def update_booking_status(pemesanan_id: int, req: BookingStatusUpdateRequest, re
         cursor.close()
         conn.close()
 
-
 import asyncio
 
 async def check_expired_bookings_loop():
@@ -660,10 +728,11 @@ async def check_expired_bookings_loop():
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
             
+            # HANYA cari yang menunggu_pembayaran
             cursor.execute(
                 """
                 SELECT pemesanan_id FROM pemesanan_master 
-                WHERE status_pemesanan IN ('menunggu_pembayaran', 'menunggu_konfirmasi')
+                WHERE status_pemesanan = 'menunggu_pembayaran'
                   AND expired_at < NOW()
                 """
             )
@@ -671,13 +740,7 @@ async def check_expired_bookings_loop():
             
             for b in expired:
                 pid = b["pemesanan_id"]
-                cursor.execute("SELECT tent_id FROM detail_pemesanan WHERE pemesanan_id = %s", (pid,))
-                detail = cursor.fetchone()
-                if detail:
-                    cursor.execute(
-                        "UPDATE tent SET status = 'tersedia' WHERE tent_id = %s",
-                        (detail["tent_id"],)
-                    )
+                # HANYA update status pesanannya. JANGAN ubah status di tabel tent.
                 cursor.execute(
                     "UPDATE pemesanan_master SET status_pemesanan = 'expired' WHERE pemesanan_id = %s",
                     (pid,)
@@ -689,7 +752,7 @@ async def check_expired_bookings_loop():
         except Exception as e:
             print(f"Error checking expired bookings: {e}")
         
-        await asyncio.sleep(300) # Check every 5 minutes (300 seconds)
+        await asyncio.sleep(60) # Ubah ke 60 detik agar sistem lebih responsif
 
 @app.on_event("startup")
 async def startup_event():

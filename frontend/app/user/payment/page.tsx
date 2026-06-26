@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Wallet, UploadCloud, CheckCircle2, Building, Image as ImageIcon, Copy } from 'lucide-react';
+import Swal from "sweetalert2";
 
 const bankOptions = [
   { id: 'bca', name: 'Bank BCA', acc: '1234 5678 9012', logo: 'BCA' },
@@ -12,6 +13,8 @@ const bankOptions = [
 export default function PaymentPage() {
   const router = useRouter();
   
+  const searchParams = useSearchParams();
+  const pemesananId = Number(searchParams.get("pemesanan_id"));
   const [orderToPay, setOrderToPay] = useState<any>(null);
   const [selectedBank, setSelectedBank] = useState(bankOptions[0]);
   const [file, setFile] = useState<File | null>(null);
@@ -23,12 +26,22 @@ export default function PaymentPage() {
         const res = await fetch('http://localhost:6969/api/bookings', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
-          const pending = data.bookings.find((o: any) => o.status_pemesanan === 'menunggu_pembayaran');
+          const pending = data.bookings.find(
+              (o: any) =>
+                o.pemesanan_id === pemesananId &&
+                o.status_pemesanan === "menunggu_pembayaran"
+          );
           if (pending) {
-            setOrderToPay(pending);
+              setOrderToPay(pending);
           } else {
-            alert("Tidak ada tagihan yang perlu dibayar.");
-            router.push('/user/dashboard');
+              await Swal.fire({
+                  icon: "error",
+                  title: "Pesanan Tidak Ditemukan",
+                  text: "Pesanan yang dipilih tidak ditemukan atau sudah tidak dapat dibayar.",
+                  confirmButtonColor: "#059669",
+              });
+
+              router.push("/user/dashboard");
           }
         }
       } catch (err) {
@@ -36,11 +49,17 @@ export default function PaymentPage() {
       }
     };
     fetchPendingBooking();
-  }, [router]);
+  }, [router, pemesananId]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(selectedBank.acc.replace(/\s/g, ''));
-    alert(`Nomor rekening ${selectedBank.name} berhasil disalin!`);
+    Swal.fire({
+      icon: "success",
+      title: "Berhasil Disalin",
+      text: `Nomor rekening ${selectedBank.name} berhasil disalin.`,
+      timer: 1500,
+      showConfirmButton: false,
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,7 +70,14 @@ export default function PaymentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return alert("Silakan unggah bukti transfer!");
+    if (!file) {
+      return Swal.fire({
+        icon: "warning",
+        title: "Bukti Transfer Belum Dipilih",
+        text: "Silakan unggah bukti transfer terlebih dahulu.",
+        confirmButtonColor: "#f59e0b",
+      });
+    }
     
     setIsSubmitting(true);
     
@@ -67,14 +93,31 @@ export default function PaymentPage() {
       });
 
       if (res.ok) {
-        alert("Bukti berhasil diunggah! Sedang menunggu verifikasi Admin.");
-        router.push('/user/dashboard');
+        await Swal.fire({
+          icon: "success",
+          title: "Bukti Berhasil Diunggah",
+          text: "Pembayaran berhasil dikirim dan sedang menunggu verifikasi admin.",
+          confirmButtonText: "Ke Dashboard",
+          confirmButtonColor: "#059669",
+        });
+
+        router.push("/user/dashboard");
       } else {
         const err = await res.json();
-        alert(`Gagal: ${err.detail}`);
+        await Swal.fire({
+          icon: "error",
+          title: "Upload Gagal",
+          text: err.detail,
+          confirmButtonColor: "#dc2626",
+        });
       }
     } catch (err) {
-      alert("Terjadi kesalahan sistem saat mengunggah bukti.");
+      await Swal.fire({
+        icon: "error",
+        title: "Server Error",
+        text: "Terjadi kesalahan sistem saat mengunggah bukti pembayaran.",
+        confirmButtonColor: "#dc2626",
+      });
     } finally {
       setIsSubmitting(false);
     }
