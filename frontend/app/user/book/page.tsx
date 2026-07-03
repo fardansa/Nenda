@@ -222,10 +222,24 @@ export default function BookingPage() {
           {/* PILIH TANGGAL */}
           {step === 1 && (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 className="text-xl font-bold text-stone-800 mb-6 flex items-center gap-2">
-                <CalendarDays className="text-emerald-500"/> Pilih Tanggal Camping
-              </h2>
-              
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2">
+                  <CalendarDays className="text-emerald-500"/> Pilih Tanggal Camping
+                </h2>
+
+                <div className="inline-flex items-center gap-4 px-2 py-2 bg-stone-50 border border-stone-200 rounded-xl shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-stone-800 uppercase">Check-in</span>
+                    <span className="font-bold text-stone-800 bg-emerald-100 px-2 py-1 rounded-lg">14:00</span>
+                  </div>
+                  <div className="h-4 w-[1px] bg-stone-300"></div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-stone-800 uppercase">Check-out</span>
+                    <span className="font-bold text-stone-800 bg-red-300 px-2 py-1 rounded-lg">12:00</span>
+                  </div>
+                </div> 
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 custom-datepicker">
                 <style>{`
                   .custom-datepicker .react-datepicker { border: none; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); padding: 15px; font-family: inherit; }
@@ -249,22 +263,33 @@ export default function BookingPage() {
                 <div>
                   <label className="block text-sm font-bold text-stone-600 mb-2">Tanggal Check-in</label>
                   <DatePicker
-                    selected={checkIn ? new Date(checkIn + 'T00:00:00') : null}
-                    onChange={(date: Date | null) => {
-                      if (date) {
-                        const y = date.getFullYear();
-                        const m = String(date.getMonth() + 1).padStart(2, '0');
-                        const d = String(date.getDate()).padStart(2, '0');
-                        setCheckIn(`${y}-${m}-${d}`);
-                      } else {
-                        setCheckIn("");
-                      }
-                    }}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText="dd/mm/yyyy"
-                    minDate={new Date()}
-                    className="w-full p-4 bg-white border border-stone-200 text-stone-900 font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all shadow-sm"
-                  />
+                      selected={checkIn ? new Date(checkIn + 'T00:00:00') : null}
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          const y = date.getFullYear();
+                          const m = String(date.getMonth() + 1).padStart(2, '0');
+                          const d = String(date.getDate()).padStart(2, '0');
+                          const newCheckIn = `${y}-${m}-${d}`;
+                          
+                          setCheckIn(newCheckIn);
+                          
+                          setCheckOut(""); 
+
+                          const checkInTime = new Date(newCheckIn + 'T00:00:00').getTime();
+                          const maxCheckOutTime = checkInTime + (7 * 86400000);
+                          
+                          console.log("Max check-out allowed:", new Date(maxCheckOutTime));
+                          
+                        } else {
+                          setCheckIn("");
+                          setCheckOut("");
+                        }
+                      }}
+                      dateFormat="dd/MM/yyyy"
+                      placeholderText="dd/mm/yyyy"
+                      minDate={new Date()}
+                      className="w-full p-4 bg-white border border-stone-200 text-stone-900 font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all shadow-sm"
+                    />
                 </div>
                 
                 <div>
@@ -283,8 +308,10 @@ export default function BookingPage() {
                     }}
                     dateFormat="dd/MM/yyyy"
                     placeholderText="dd/mm/yyyy"
-                    minDate={checkIn ? new Date(checkIn + 'T00:00:00') : new Date()}
-                    className="w-full p-4 bg-white border border-stone-200 text-stone-900 font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all shadow-sm"
+                    disabled={!checkIn}
+                    minDate={checkIn ? new Date(new Date(checkIn + 'T00:00:00').getTime() + 86400000) : new Date(new Date().getTime() + 86400000)}
+                    maxDate={checkIn ? new Date(new Date(checkIn + 'T00:00:00').getTime() + (7 * 86400000)) : undefined}
+                    className={`w-full p-4 bg-white border border-stone-200 text-stone-900 font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all shadow-sm ${!checkIn ? 'opacity-50 cursor-not-allowed bg-stone-100' : ''}`}
                   />
                 </div>
               </div>
@@ -306,10 +333,18 @@ export default function BookingPage() {
                   <h2 className="text-xl font-bold text-stone-800 flex items-center gap-2"><Tent className="text-emerald-500"/> Pilih Paket & Tenda</h2>
                   <p className="text-stone-400 text-xs mt-1">Pilih kategori paket di bawah, lalu pilih tenda di peta. Anda bisa memilih banyak tenda.</p>
                 </div>
+                
                 <div className="flex gap-4 text-xs font-bold text-stone-500 bg-stone-100 px-4 py-2 rounded-full self-end lg:self-auto">
-                  <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-400 border border-white"></div> Tersedia</span>
-                  <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-600 border border-white"></div> Terpilih</span>
-                  <span className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-red-500 border border-white"></div> Penuh</span>
+                  <span className="flex items-center gap-1.5">
+                    <div className={`w-3 h-3 rounded-full border border-white ${
+                      activeTab === 'SINGLE' ? 'bg-emerald-400' : 
+                      activeTab === 'DOUBLE' ? 'bg-amber-400' : 'bg-blue-400'
+                    }`}></div> Tersedia
+                  </span>
+
+                  <span className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500 border border-white"></div> Penuh
+                  </span>
                 </div>
               </div>
 
@@ -321,20 +356,27 @@ export default function BookingPage() {
                   <div className="space-y-4 w-full">
                     {/* Tab Navigation (Button Style) */}
                     <div className="flex flex-wrap gap-3 pb-1">
-                      {packagesDB.map((pkg) => (
-                        <button
-                          key={pkg.id}
-                          type="button"
-                          onClick={() => setActiveTab(pkg.nama)}
-                          className={`px-5 py-2.5 rounded-full font-bold text-xs tracking-wider transition-all duration-300 shadow-sm border cursor-pointer ${
-                            activeTab === pkg.nama
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-md scale-105'
-                              : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50 hover:border-stone-300'
-                          }`}
-                        >
-                          PAKET {pkg.nama}
-                        </button>
-                      ))}
+                      {packagesDB.map((pkg) => {
+                        // KONSISTENSI WARNA TAB
+                        let activeColor = 'bg-emerald-600 border-emerald-600 shadow-emerald-500/30'; // Single
+                        if (pkg.nama === 'DOUBLE') activeColor = 'bg-amber-500 border-amber-500 shadow-amber-500/30';
+                        if (pkg.nama === 'FAMILY') activeColor = 'bg-blue-600 border-blue-600 shadow-blue-500/30';
+                        
+                        return (
+                          <button
+                            key={pkg.id}
+                            type="button"
+                            onClick={() => setActiveTab(pkg.nama)}
+                            className={`px-5 py-2.5 rounded-full font-bold text-xs tracking-wider transition-all duration-300 shadow-sm border cursor-pointer ${
+                              activeTab === pkg.nama
+                                ? `${activeColor} text-white shadow-md scale-105`
+                                : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50 hover:border-stone-300'
+                            }`}
+                          >
+                            PAKET {pkg.nama}
+                          </button>
+                        )
+                      })}
                     </div>
 
                     {/* Campground Map (Full Width) */}
@@ -351,7 +393,6 @@ export default function BookingPage() {
                         const isBooked = bookedTents.includes(tanda.id);
                         const isSelected = selectedTents.some((t: any) => t.tentId === tanda.id);
 
-                        // Tenda milik paket lain (ditampilkan redup dan tidak bisa diklik)
                         if (!isCurrentPackage) {
                           return (
                             <div 
@@ -360,6 +401,18 @@ export default function BookingPage() {
                               className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 border border-white/20 backdrop-blur-sm pointer-events-none"
                             />
                           );
+                        }
+
+                        // WARNA MARKER DI PETA
+                        let availableColorClass = 'bg-emerald-400/80 hover:bg-emerald-500';
+                        let selectedColorClass = 'bg-emerald-600 shadow-[0_0_20px_rgba(5,150,105,0.8)]';
+
+                        if (activeTab === 'DOUBLE') {
+                          availableColorClass = 'bg-amber-400/80 hover:bg-amber-500';
+                          selectedColorClass = 'bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.8)]';
+                        } else if (activeTab === 'FAMILY') {
+                          availableColorClass = 'bg-blue-400/80 hover:bg-blue-500';
+                          selectedColorClass = 'bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.8)]';
                         }
 
                         // Tenda milik paket yang aktif
@@ -372,9 +425,9 @@ export default function BookingPage() {
                             title={`Tenda ${tanda.id} ${isBooked ? '(Penuh)' : isSelected ? '(Terpilih)' : '(Tersedia)'}`}
                             className={`
                               absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center transition-all duration-300
-                              ${isSelected ? 'w-10 h-10 bg-emerald-600 text-white shadow-[0_0_20px_rgba(5,150,105,0.8)] border-2 border-white scale-125 z-20 rounded-full' : 
+                              ${isSelected ? `w-10 h-10 text-white border-2 border-white scale-125 z-20 rounded-full ${selectedColorClass}` : 
                                 isBooked ? 'w-6 h-6 bg-red-500/80 border border-white/50 cursor-not-allowed z-10 rounded-full' : 
-                                'w-8 h-8 bg-emerald-400/80 hover:bg-emerald-500 border-2 border-white text-transparent hover:text-white cursor-pointer hover:scale-110 z-10 rounded-full animate-pulse hover:animate-none'}
+                                `w-8 h-8 border-2 border-white text-transparent hover:text-white cursor-pointer hover:scale-110 z-10 rounded-full animate-pulse hover:animate-none ${availableColorClass}`}
                             `}
                           >
                             <span className={`font-black text-[10px] ${isSelected ? 'block' : 'hidden md:block opacity-0 hover:opacity-100'}`}>
@@ -465,6 +518,20 @@ export default function BookingPage() {
                 </div>
 
                 <hr className="border-stone-200" />
+
+                <div className="inline-flex items-center gap-4 px-5 py-3 mb-8 bg-stone-50 border border-stone-200 rounded-xl shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-stone-800 uppercase">Check-in</span>
+                  <span className="font-extrabold text-stone-800 bg-emerald-100 px-3 py-1 rounded-lg">14:00</span>
+                </div>
+                
+                <div className="h-4 w-[1px] bg-stone-300"></div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-stone-800 uppercase">Check-out</span>
+                  <span className="font-extrabold text-stone-800 bg-red-300 px-3 py-1 rounded-lg">12:00</span>
+                </div>
+              </div>
 
                 {/* Daftar Tenda Detail */}
                 <div className="space-y-3">

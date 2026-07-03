@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, Filter, CheckCircle, XCircle, Eye, Receipt, AlertCircle, RefreshCw } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function UtilitiesPage() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -25,7 +26,9 @@ export default function UtilitiesPage() {
           } else if (b.status_pemesanan === 'telah_dibayar') {
             uiStatus = "Dikonfirmasi";
           } else if (b.status_pemesanan === 'dibatalkan') {
-            uiStatus = "Dibatalkan";
+            uiStatus = "Dibatalkan"; 
+          } else if (b.status_pemesanan === 'ditolak_admin') {
+            uiStatus = "Ditolak Admin"; 
           }
           
           return {
@@ -61,38 +64,78 @@ export default function UtilitiesPage() {
         credentials: 'include'
       });
       if (res.ok) {
-        alert("Pembayaran berhasil dikonfirmasi!");
+        Swal.fire({
+          title: 'Berhasil!',
+          text: 'Pembayaran berhasil dikonfirmasi!',
+          icon: 'success',
+          confirmButtonColor: '#10b981'
+        });
         fetchPayments();
       } else {
-        alert("Gagal mengonfirmasi pembayaran.");
+        Swal.fire({
+          title: 'Gagal!',
+          text: 'Gagal mengonfirmasi pembayaran.',
+          icon: 'error',
+          confirmButtonColor: '#ef4444'
+        });
       }
     } catch (err) {
       console.error(err);
+      Swal.fire('Error!', 'Terjadi kesalahan sistem.', 'error');
     }
   };
 
   const handleReject = async (id: number) => {
     try {
+      const confirmReject = await Swal.fire({
+        title: 'Tolak Pembayaran?',
+        text: "Anda yakin ingin menolak bukti pembayaran ini?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#a8a29e',
+        confirmButtonText: 'Ya, Tolak!',
+        cancelButtonText: 'Batal'
+      });
+
+      if (!confirmReject.isConfirmed) return;
+
       const res = await fetch(`http://localhost:6969/api/admin/bookings/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'dibatalkan' }),
+        body: JSON.stringify({ status: 'ditolak_admin' }),
         credentials: 'include'
       });
       if (res.ok) {
-        alert("Pembayaran berhasil ditolak!");
+        Swal.fire({
+          title: 'Ditolak!',
+          text: 'Pembayaran berhasil ditolak.',
+          icon: 'success',
+          confirmButtonColor: '#10b981'
+        });
         fetchPayments();
       } else {
-        alert("Gagal menolak pembayaran.");
+        Swal.fire('Gagal!', 'Gagal menolak pembayaran.', 'error');
       }
     } catch (err) {
       console.error(err);
+      Swal.fire('Error!', 'Terjadi kesalahan sistem.', 'error');
     }
   };
 
   const handleCancelOrder = async (id: number) => {
-    const confirmCancel = window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini secara manual?");
-    if (!confirmCancel) return;
+    const confirmCancel = await Swal.fire({
+      title: 'Batalkan Pesanan?',
+      text: "Apakah Anda yakin ingin membatalkan pesanan ini secara manual?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#a8a29e',
+      confirmButtonText: 'Ya, Batalkan!',
+      cancelButtonText: 'Kembali'
+    });
+
+    if (!confirmCancel.isConfirmed) return;
     
     try {
       const res = await fetch(`http://localhost:6969/api/admin/bookings/${id}/status`, {
@@ -102,13 +145,19 @@ export default function UtilitiesPage() {
         credentials: 'include'
       });
       if (res.ok) {
-        alert("Pesanan berhasil dibatalkan secara manual!");
+        Swal.fire({
+          title: 'Dibatalkan!',
+          text: 'Pesanan berhasil dibatalkan secara manual.',
+          icon: 'success',
+          confirmButtonColor: '#10b981'
+        });
         fetchPayments();
       } else {
-        alert("Gagal membatalkan pesanan.");
+        Swal.fire('Gagal!', 'Gagal membatalkan pesanan.', 'error');
       }
     } catch (err) {
       console.error(err);
+      Swal.fire('Error!', 'Terjadi kesalahan sistem.', 'error');
     }
   };
 
@@ -124,7 +173,7 @@ export default function UtilitiesPage() {
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
           <div className="flex bg-white rounded-xl border border-stone-200 p-1 shadow-sm">
-            {['Menunggu Validasi', 'Dikonfirmasi', 'Belum Bayar'].map((tab) => (
+            {['Belum Bayar', 'Menunggu Validasi', 'Dikonfirmasi'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

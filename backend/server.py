@@ -671,31 +671,59 @@ def get_admin_bookings(request: Request):
 
 class BookingStatusUpdateRequest(BaseModel):
     status: str
+    alasan_admin: Optional[str] = None
+    catatan_admin: Optional[str] = None
 
 
 @app.post("/api/admin/bookings/{pemesanan_id}/status")
 def update_booking_status(pemesanan_id: int, req: BookingStatusUpdateRequest, request: Request):
     get_admin_user(request)
-    if req.status not in ["telah_dibayar", "dibatalkan", "menunggu_konfirmasi", "menunggu_pembayaran"]:
+    
+    allowed_statuses = ["telah_dibayar", "dibatalkan", "ditolak_admin", "menunggu_konfirmasi", "menunggu_pembayaran"]
+    if req.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Invalid status value")
         
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+    
     try:
-        cursor.execute("SELECT status_pemesanan, total_harga FROM pemesanan_master WHERE pemesanan_id = %s", (pemesanan_id,))
+        # 1. ambil data booking + user_id
+        cursor.execute(
+            "SELECT user_id, total_harga FROM pemesanan_master WHERE pemesanan_id = %s",
+            (pemesanan_id,)
+        )
         booking = cursor.fetchone()
         if not booking:
             raise HTTPException(status_code=404, detail="Booking not found")
-            
+
+        user_id = booking["user_id"]
+
+        # 2. update status + alasan admin + catatan
         cursor.execute(
-            "UPDATE pemesanan_master SET status_pemesanan = %s WHERE pemesanan_id = %s",
-            (req.status, pemesanan_id)
+            """
+            UPDATE pemesanan_master 
+            SET status_pemesanan = %s,
+                alasan_admin = %s,
+                catatan_admin = %s
+            WHERE pemesanan_id = %s
+            """,
+            (req.status, req.alasan_admin, req.catatan_admin, pemesanan_id)
         )
-        
-        pay_status = "diterima" if req.status == "telah_dibayar" else "ditolak" if req.status == "dibatalkan" else "menunggu_verifikasi"
-        
-        cursor.execute("SELECT pembayaran_id FROM pembayaran WHERE pemesanan_id = %s", (pemesanan_id,))
+
+        # 3. logic payment status
+        if req.status == "telah_dibayar":
+            pay_status = "diterima"
+        elif req.status in ["dibatalkan", "ditolak_admin"]:
+            pay_status = "ditolak"
+        else:
+            pay_status = "menunggu_verifikasi"
+
+        cursor.execute(
+            "SELECT pembayaran_id FROM pembayaran WHERE pemesanan_id = %s",
+            (pemesanan_id,)
+        )
         existing_pay = cursor.fetchone()
+
         if existing_pay:
             cursor.execute(
                 "UPDATE pembayaran SET status_pembayaran = %s WHERE pemesanan_id = %s",
@@ -711,11 +739,32 @@ def update_booking_status(pemesanan_id: int, req: BookingStatusUpdateRequest, re
                     (pemesanan_id, booking["total_harga"], pay_status)
                 )
 
+        # 4. INSERT NOTIFIKASI (INI TAMBAHAN UTAMA)
+        judul = f"Update Pesanan: {req.status}"
+
+        pesan = f"Status pesanan Anda berubah menjadi {req.status}."
+
+        if req.alasan_admin:
+            pesan += f" | Alasan: {req.alasan_admin}"
+
+        if req.catatan_admin:
+            pesan += f" | Catatan: {req.catatan_admin}"
+
+        cursor.execute(
+            """
+            INSERT INTO notifikasi (user_id, pemesanan_id, judul, pesan)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, pemesanan_id, judul, pesan)
+        )
+
         conn.commit()
         return {"status": "success", "message": f"Booking status updated to {req.status}"}
+
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
     finally:
         cursor.close()
         conn.close()
@@ -752,7 +801,7 @@ async def check_expired_bookings_loop():
         except Exception as e:
             print(f"Error checking expired bookings: {e}")
         
-        await asyncio.sleep(60) # Ubah ke 60 detik agar sistem lebih responsif
+        await asyncio.sleep(60) 
 
 @app.on_event("startup")
 async def startup_event():
@@ -762,3 +811,66 @@ async def startup_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("server:app", host="0.0.0.0", port=6969, reload=True)
+
+@app.get("/api/notifikasi")
+def get_notifications(request: Request):
+    user = get_current_user(request)
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            """
+            SELECT notifikasi_id, user_id, pemesanan_id, judul, pesan, is_read, created_at
+            FROM notifikasi
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            """,
+            (user["user_id"],)
+        )
+
+        notifications = cursor.fetchall()
+
+        # convert datetime biar aman di JSON
+        for n in notifications:
+            if n.get("created_at") is not None:
+                n["created_at"] = str(n["created_at"])
+
+        return {"notifications": notifications}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.post("/api/notifikasi/{notifikasi_id}/read")
+def mark_notification_as_read(notifikasi_id: int, request: Request):
+    user = get_current_user(request)
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            """
+            UPDATE notifikasi
+            SET is_read = TRUE
+            WHERE notifikasi_id = %s AND user_id = %s
+            """,
+            (notifikasi_id, user["user_id"])
+        )
+
+        conn.commit()
+
+        return {"status": "success", "message": "Notification marked as read"}
+
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        cursor.close()
+        conn.close()

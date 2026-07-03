@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Tent, MapPin, CalendarClock, ArrowRight, Clock, CheckCircle2, FileText, CreditCard, Search } from 'lucide-react';
+import { Tent, MapPin, CalendarClock, ArrowRight, Clock, CheckCircle2, FileText, CreditCard, Search, XCircle } from 'lucide-react';
 import Swal from "sweetalert2";
 
 export default function UserDashboardPage() {
@@ -31,6 +31,41 @@ export default function UserDashboardPage() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
   };
 
+  const statusConfig: any = {
+    telah_dibayar: { 
+      label: 'Lunas', 
+      color: 'bg-emerald-100 text-emerald-700', 
+      icon: <CheckCircle2 size={14}/> 
+    },
+    menunggu_konfirmasi: { 
+      label: 'Menunggu Verifikasi', 
+      color: 'bg-blue-100 text-blue-700', 
+      icon: <Search size={14}/> 
+    },
+    menunggu_pembayaran: { 
+      label: 'Menunggu Pembayaran', 
+      color: 'bg-amber-100 text-amber-700', 
+      icon: <Clock size={14}/> 
+    },
+
+    dibatalkan: { 
+      label: 'Dibatalkan', 
+      color: 'bg-purple-100 text-purple-700', 
+      icon: <XCircle size={14}/> 
+    },
+
+    ditolak_admin: { 
+      label: 'Ditolak Admin', 
+      color: 'bg-red-100 text-red-700', 
+      icon: <XCircle size={14}/> 
+    },
+    expired: { 
+      label: 'Kadaluarsa', 
+      color: 'bg-[#3e2723] text-[#fbe9e7]', 
+      icon: <Clock size={14}/> 
+    },
+  };
+
   return (
     <div className="space-y-8 max-w-5xl">
       <div>
@@ -48,6 +83,7 @@ export default function UserDashboardPage() {
             {orders.length > 0 && orders[0].status_pemesanan === 'menunggu_pembayaran' ? 'Menunggu Pembayaran' : 
              orders.length > 0 && orders[0].status_pemesanan === 'menunggu_konfirmasi' ? 'Sedang Diverifikasi Admin' :
              orders.length > 0 && orders[0].status_pemesanan === 'telah_dibayar' ? 'Perkemahan Terjadwal' : 
+             orders.length > 0 && orders[0].status_pemesanan === 'ditolak_admin' ? 'Pesanan Ditolak' :
              orders.length > 0 && (orders[0].status_pemesanan === 'dibatalkan' || orders[0].status_pemesanan === 'expired') ? 'Pesanan Tidak Aktif' :
              'Belum Ada Perkemahan Terjadwal'}
           </h2>
@@ -55,6 +91,7 @@ export default function UserDashboardPage() {
             {orders.length > 0 && orders[0].status_pemesanan === 'menunggu_pembayaran' ? `Segera selesaikan pembayaran untuk mengamankan tenda ${orders[0].nomor_tent}.` : 
              orders.length > 0 && orders[0].status_pemesanan === 'menunggu_konfirmasi' ? `Bukti pembayaran tenda ${orders[0].nomor_tent} sudah diterima. Admin akan segera memverifikasinya.` :
              orders.length > 0 && orders[0].status_pemesanan === 'telah_dibayar' ? `Tenda ${orders[0].nomor_tent} sudah siap! Jangan lupa bawa perlengkapan pribadi.` :
+             orders.length > 0 && orders[0].status_pemesanan === 'ditolak_admin' ? 'Mohon maaf, pesanan Anda tidak dapat diproses oleh admin. Silakan hubungi support atau buat pesanan baru.' :
              orders.length > 0 && (orders[0].status_pemesanan === 'dibatalkan' || orders[0].status_pemesanan === 'expired') ? 'Pesanan ini tidak berhasil diproses. Silakan buat pesanan baru.' :
             'Kamu belum memiliki reservasi tenda yang aktif. Yuk, rencanakan liburanmu!'}
           </p>
@@ -90,18 +127,10 @@ export default function UserDashboardPage() {
                       ID: {order.pemesanan_id}
                     </span>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
-                      order.status_pemesanan === 'telah_dibayar' ? 'bg-emerald-100 text-emerald-700' : 
-                      order.status_pemesanan === 'menunggu_konfirmasi' ? 'bg-blue-100 text-blue-700' :
-                      (order.status_pemesanan === 'dibatalkan' || order.status_pemesanan === 'expired') ? 'bg-red-100 text-red-700' :
-                      'bg-orange-100 text-orange-700'
+                      statusConfig[order.status_pemesanan]?.color || 'bg-stone-100 text-stone-600'
                     }`}>
-                      {order.status_pemesanan === 'telah_dibayar' ? <CheckCircle2 size={14}/> : 
-                       order.status_pemesanan === 'menunggu_konfirmasi' ? <Search size={14}/> : <Clock size={14}/>}
-                      
-                      {order.status_pemesanan === 'menunggu_pembayaran' ? 'Menunggu Pembayaran' : 
-                       order.status_pemesanan === 'menunggu_konfirmasi' ? 'Menunggu Verifikasi' : 
-                       order.status_pemesanan === 'dibatalkan' ? 'Dibatalkan' : 
-                       order.status_pemesanan === 'expired' ? 'Kadaluarsa' : 'Lunas'}
+                      {statusConfig[order.status_pemesanan]?.icon || <Clock size={14}/>}
+                      {statusConfig[order.status_pemesanan]?.label || 'Status Tidak Diketahui'}
                     </span>
                   </div>
                   
