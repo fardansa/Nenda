@@ -69,7 +69,7 @@ export default function UserDashboardPage() {
   return (
     <div className="space-y-8 max-w-5xl">
       <div>
-        <h1 className="text-3xl font-extrabold text-stone-800 tracking-tight">Dashboard Saya</h1>
+        <h1 className="text-3xl font-extrabold text-stone-800 tracking-tight">Riwayat pesanan saya</h1>
         <p className="text-stone-500 text-sm mt-1">Pantau pesanan tenda kamu dan bersiaplah untuk petualangan selanjutnya.</p>
       </div>
 

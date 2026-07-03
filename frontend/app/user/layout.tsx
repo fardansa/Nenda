@@ -2,17 +2,40 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Tent, Clock, LogOut, Bell, User } from 'lucide-react';
 
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const navRef = useRef<HTMLDivElement>(null);
+
+const [indicatorStyle, setIndicatorStyle] =
+  useState<React.CSSProperties>({
+    top: "0px",
+    height: "0px",
+    opacity: 0,
+  });
+
+const navLinks = [
+  {
+    name: "Riwayat Pesanan",
+    href: "/user/dashboard",
+    icon: <LayoutDashboard size={18} />,
+  },
+  {
+    name: "Pesan Tenda Baru",
+    href: "/user/book",
+    icon: <Tent size={18} />,
+  },
+];
 
   const fetchNotifications = async () => {
   try {
@@ -89,6 +112,33 @@ const handleNotificationClick = async (notification: any) => {
   }
 };
 
+  useEffect(() => {
+  if (!navRef.current) return;
+
+  const activeIndex = navLinks.findIndex(
+    (item) => item.href === pathname
+  );
+
+  if (activeIndex === -1) {
+    setIndicatorStyle((prev) => ({
+      ...prev,
+      opacity: 0,
+    }));
+    return;
+  }
+
+  const activeElement =
+    navRef.current.querySelectorAll("a")[activeIndex] as HTMLElement;
+
+  if (!activeElement) return;
+
+  setIndicatorStyle({
+    top: `${activeElement.offsetTop}px`,
+    height: `${activeElement.offsetHeight}px`,
+    opacity: 1,
+  });
+}, [pathname]);
+
   const handleLogout = async () => {
     try {
       await fetch('http://localhost:6969/api/logout', { 
@@ -112,16 +162,36 @@ const handleNotificationClick = async (notification: any) => {
           </Link>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          <Link href="/user/dashboard" className="flex items-center gap-3 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold shadow-md transition-all">
-            <LayoutDashboard size={18} /><span>Dashboard Saya</span>
-          </Link>
-          <Link href="/user/book" className="flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
-            <Tent size={18} /><span>Pesan Tenda Baru</span>
-          </Link>
-          <Link href="/user/dashboard" className="flex items-center gap-3 px-4 py-3 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition font-semibold">
-            <Clock size={18} /><span>Riwayat Transaksi</span>
-          </Link>
+        <nav
+          ref={navRef}
+          className="flex-1 px-4 py-6 space-y-2 relative"
+        >
+          <div
+            className="absolute left-4 right-4 bg-emerald-600 rounded-xl shadow-md transition-all duration-300 ease-out pointer-events-none"
+            style={{
+              ...indicatorStyle,
+              zIndex: 0,
+            }}
+          />
+
+          {navLinks.map((item) => {
+            const isActive = pathname === item.href;
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`relative z-10 flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
+                  isActive
+                    ? "text-white"
+                    : "text-stone-400 hover:text-white hover:bg-stone-800/40"
+                }`}
+              >
+                {item.icon}
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-stone-800">

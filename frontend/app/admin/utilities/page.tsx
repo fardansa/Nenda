@@ -259,10 +259,10 @@ export default function UtilitiesPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button 
                             onClick={() => handleReject(pay.id)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" 
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition cursor-pointer" 
                             title="Tolak Pembayaran"
                           >
-                            <XCircle size={20} />
+                            <XCircle size={14} /> Tolak
                           </button>
                           <button 
                             onClick={() => handleConfirm(pay.id)}

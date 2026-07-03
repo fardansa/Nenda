@@ -44,11 +44,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/');
   };
 
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({
+    top: '0px',
+    height: '0px',
+    opacity: 0
+  });
+
+  const navRef = React.useRef<HTMLDivElement>(null);
+
   const navLinks = [
-    { name: "Status Tenda", href: "/admin/tents", icon: <Tent size={18} /> },
+    { name: "Dashboard Keuangan", href: "/admin/dashboard", icon: <LayoutDashboard size={18} /> },
+    { name: "Status & Unit Tenda", href: "/admin/tents", icon: <Tent size={18} /> },
+    { name: "Manajemen Paket", href: "/admin/packages", icon: <Settings size={18} /> },
     { name: "Verifikasi Pembayaran", href: "/admin/utilities", icon: <CreditCard size={18} /> },
     { name: "Data Pelanggan", href: "/admin/users", icon: <Users size={18} /> }
   ];
+
+  useEffect(() => {
+    const idx = navLinks.findIndex(link => pathname === link.href);
+    setActiveIndex(idx);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (activeIndex === -1 || !navRef.current) {
+      setIndicatorStyle(prev => ({ ...prev, opacity: 0 }));
+      return;
+    }
+    
+    // Cari element Link aktif di dalam nav
+    const activeElement = navRef.current.children[activeIndex + 1] as HTMLElement; // index + 1 karena anak pertama adalah div sliding indicator
+    if (activeElement) {
+      setIndicatorStyle({
+        top: `${activeElement.offsetTop}px`,
+        height: `${activeElement.offsetHeight}px`,
+        opacity: 1
+      });
+    }
+  }, [activeIndex]);
 
   if (loading) {
     return (
@@ -69,15 +102,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="text-2xl font-extrabold text-emerald-400 tracking-tighter">Nenda<span className="text-white">.Admin</span></span>
         </div>
         
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {navLinks.map((link) => {
+        <nav ref={navRef} className="flex-1 px-4 py-6 space-y-2 relative">
+          {/* Sliding Green Indicator */}
+          <div 
+            className="absolute left-4 right-4 bg-emerald-600 rounded-xl transition-all duration-300 ease-out shadow-md pointer-events-none"
+            style={{
+              ...indicatorStyle,
+              zIndex: 0
+            }}
+          />
+
+          {navLinks.map((link, index) => {
             const isActive = pathname === link.href;
             return (
               <Link 
                 key={link.name} 
                 href={link.href} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold ${
-                  isActive ? 'bg-emerald-600 text-white shadow-md' : 'text-stone-400 hover:text-white hover:bg-stone-800'
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold relative z-10 ${
+                  isActive ? 'text-white' : 'text-stone-400 hover:text-white hover:bg-stone-800/40'
                 }`}
               >
                 {link.icon}
@@ -95,7 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* HEADER & MAIN CONTENT */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 ml-64 flex flex-col min-h-screen overflow-x-hidden max-w-full">
         <header className="h-20 bg-white border-b border-stone-200 flex items-center justify-between px-8 sticky top-0 z-20">
           <div className="text-stone-500 font-medium text-sm">Sistem Reservasi Camping Nenda</div>
           <div className="flex items-center gap-4">

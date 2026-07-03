@@ -43,6 +43,19 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
 
+class TentCreateUpdate(BaseModel):
+    paket_id: int
+    nomor_tent: str
+    nomor_loker: str
+    status: str
+
+class PaketCreateUpdate(BaseModel):
+    nama_paket: str
+    deskripsi: str
+    fasilitas: str
+    kapasitas: int
+    harga: int
+
 # Password Hashing Helpers
 def hash_password(password: str) -> str:
     pwd_bytes = password.encode('utf-8')
@@ -276,6 +289,245 @@ def update_tent_status(tent_id: int, req: TentStatusUpdate, request: Request):
         return {"status": "success", "message": "Tent status updated successfully"}
     except mysql.connector.Error as db_err:
         raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# --- CRUD Tents ---
+@app.post("/api/admin/tents")
+def create_tent(req: TentCreateUpdate, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "INSERT INTO tent (paket_id, nomor_tent, nomor_loker, status) VALUES (%s, %s, %s, %s)",
+            (req.paket_id, req.nomor_tent, req.nomor_loker, req.status)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Tent created successfully", "tent_id": cursor.lastrowid}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.put("/api/admin/tents/{tent_id}")
+def update_tent(tent_id: int, req: TentCreateUpdate, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "UPDATE tent SET paket_id = %s, nomor_tent = %s, nomor_loker = %s, status = %s WHERE tent_id = %s",
+            (req.paket_id, req.nomor_tent, req.nomor_loker, req.status, tent_id)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Tent updated successfully"}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.delete("/api/admin/tents/{tent_id}")
+def delete_tent(tent_id: int, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Cek apakah tenda ini sedang digunakan dalam transaksi aktif
+        cursor.execute("""
+            SELECT 1 FROM detail_pemesanan dp
+            JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
+            WHERE dp.tent_id = %s AND pm.status_pemesanan IN ('menunggu_pembayaran', 'menunggu_konfirmasi', 'telah_dibayar')
+        """, (tent_id,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Tenda tidak dapat dihapus karena memiliki transaksi aktif")
+            
+        cursor.execute("DELETE FROM tent WHERE tent_id = %s", (tent_id,))
+        conn.commit()
+        return {"status": "success", "message": "Tent deleted successfully"}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# --- CRUD Packages ---
+@app.get("/api/admin/packages")
+def get_admin_packages(request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM paket ORDER BY paket_id ASC")
+        packages = cursor.fetchall()
+        return {"packages": packages}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.post("/api/admin/packages")
+def create_package(req: PaketCreateUpdate, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "INSERT INTO paket (nama_paket, deskripsi, fasilitas, kapasitas, harga) VALUES (%s, %s, %s, %s, %s)",
+            (req.nama_paket, req.deskripsi, req.fasilitas, req.kapasitas, req.harga)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Package created successfully", "paket_id": cursor.lastrowid}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.put("/api/admin/packages/{paket_id}")
+def update_package(paket_id: int, req: PaketCreateUpdate, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "UPDATE paket SET nama_paket = %s, deskripsi = %s, fasilitas = %s, kapasitas = %s, harga = %s WHERE paket_id = %s",
+            (req.nama_paket, req.deskripsi, req.fasilitas, req.kapasitas, req.harga, paket_id)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Package updated successfully"}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.delete("/api/admin/packages/{paket_id}")
+def delete_package(paket_id: int, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Cek apakah paket ini dirujuk oleh tenda apa pun
+        cursor.execute("SELECT 1 FROM tent WHERE paket_id = %s LIMIT 1", (paket_id,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Paket tidak dapat dihapus karena masih digunakan oleh beberapa unit tenda")
+            
+        cursor.execute("DELETE FROM paket WHERE paket_id = %s", (paket_id,))
+        conn.commit()
+        return {"status": "success", "message": "Package deleted successfully"}
+    except mysql.connector.Error as db_err:
+        raise HTTPException(status_code=500, detail=f"Database error: {db_err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# --- Availability by Date ---
+@app.get("/api/admin/tents/availability-by-date")
+def get_tents_availability_by_date(date: str, request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = """
+            SELECT t.tent_id, t.nomor_tent, t.nomor_loker, t.status AS status_tenda, p.nama_paket, p.harga,
+                   booking_info.pemesanan_id, booking_info.status_pemesanan, booking_info.user_nama, 
+                   booking_info.tanggal_checkin, booking_info.tanggal_checkout
+            FROM tent t
+            JOIN paket p ON t.paket_id = p.paket_id
+            LEFT JOIN (
+                SELECT dp.tent_id, MAX(pm.pemesanan_id) AS pemesanan_id, 
+                       MAX(pm.status_pemesanan) AS status_pemesanan, 
+                       MAX(u.nama) AS user_nama, 
+                       MAX(pm.tanggal_checkin) AS tanggal_checkin, 
+                       MAX(pm.tanggal_checkout) AS tanggal_checkout
+                FROM detail_pemesanan dp
+                JOIN pemesanan_master pm ON dp.pemesanan_id = pm.pemesanan_id
+                JOIN user u ON pm.user_id = u.user_id
+                WHERE (
+                    pm.status_pemesanan IN ('telah_dibayar', 'menunggu_konfirmasi')
+                    OR (pm.status_pemesanan = 'menunggu_pembayaran' AND pm.expired_at > NOW())
+                )
+                AND pm.tanggal_checkin <= %s
+                AND pm.tanggal_checkout > %s
+                GROUP BY dp.tent_id
+            ) booking_info ON t.tent_id = booking_info.tent_id
+            ORDER BY t.tent_id ASC
+        """
+        cursor.execute(query, (date, date))
+        rows = cursor.fetchall()
+        for r in rows:
+            if r.get("tanggal_checkin") is not None:
+                r["tanggal_checkin"] = str(r["tanggal_checkin"])
+            if r.get("tanggal_checkout") is not None:
+                r["tanggal_checkout"] = str(r["tanggal_checkout"])
+        return {"tents": rows}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        conn.close()
+
+# --- Finance Summary ---
+@app.get("/api/admin/finance/summary")
+def get_finance_summary(request: Request):
+    get_admin_user(request)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 1. Total Pendapatan Diterima
+        cursor.execute("SELECT SUM(total_pembayaran) AS total FROM pembayaran WHERE status_pembayaran = 'diterima'")
+        total_income = cursor.fetchone()["total"] or 0
+        
+        # 2. Total Transaksi Sukses
+        cursor.execute("SELECT COUNT(*) AS total FROM pemesanan_master WHERE status_pemesanan = 'telah_dibayar'")
+        success_transactions = cursor.fetchone()["total"] or 0
+        
+        # 3. Transaksi Menunggu Konfirmasi
+        cursor.execute("SELECT COUNT(*) AS total FROM pemesanan_master WHERE status_pemesanan = 'menunggu_konfirmasi'")
+        pending_transactions = cursor.fetchone()["total"] or 0
+        
+        # 4. Transaksi Dibatalkan / Ditolak
+        cursor.execute("SELECT COUNT(*) AS total FROM pemesanan_master WHERE status_pemesanan IN ('dibatalkan', 'expired', 'ditolak_admin')")
+        failed_transactions = cursor.fetchone()["total"] or 0
+
+        # 5. Pendapatan per Bulan (Grafik)
+        cursor.execute("""
+            SELECT DATE_FORMAT(tanggal_pembayaran, '%Y-%m') AS bulan, SUM(total_pembayaran) AS total
+            FROM pembayaran
+            WHERE status_pembayaran = 'diterima'
+            GROUP BY bulan
+            ORDER BY bulan ASC
+        """)
+        monthly_income = cursor.fetchall()
+        
+        # 6. Transaksi Terbaru
+        cursor.execute("""
+            SELECT pm.pemesanan_id, u.nama AS user_nama, pm.total_harga, pm.status_pemesanan, pm.created_at
+            FROM pemesanan_master pm
+            JOIN user u ON pm.user_id = u.user_id
+            ORDER BY pm.pemesanan_id DESC
+            LIMIT 5
+        """)
+        recent_transactions = cursor.fetchall()
+        for rt in recent_transactions:
+            rt["created_at"] = str(rt["created_at"])
+
+        return {
+            "total_income": total_income,
+            "success_transactions": success_transactions,
+            "pending_transactions": pending_transactions,
+            "failed_transactions": failed_transactions,
+            "monthly_income": monthly_income,
+            "recent_transactions": recent_transactions
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
         conn.close()
