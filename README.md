@@ -3,8 +3,8 @@
 ## Prerequisites
 
 1. Python
-
-2. XAMPP
+2. Node.js (disarankan versi 18 ke atas)
+3. XAMPP
 
 ## Langkah 1: Menyiapkan Database (MySQL)
 
@@ -62,13 +62,40 @@
    pip install -r requirements.txt
    ```
 
-## Langkah 4: Menjalankan Server Aplikasi
+## Langkah 4: Menjalankan Server Backend
 
 1. Pastikan Anda masih berada di folder `backend/` dengan Virtual Environment yang aktif.
 2. Jalankan server dengan mengeksekusi script python:
    ```cmd
    python server.py
    ```
+3. Biarkan terminal ini tetap berjalan (jangan ditutup) selama proses testing berlangsung.
+
+## Langkah 5: Menjalankan Frontend (Next.js)
+
+1. Buka **terminal baru** (biarkan terminal backend pada Langkah 4 tetap berjalan).
+2. Masuk ke dalam folder `frontend/` proyek ini. Contoh perintah:
+   ```cmd
+   cd path\to\Nenda\frontend
+   ```
+3. Install seluruh dependensi Node.js (wajib dilakukan minimal sekali sebelum menjalankan project):
+   ```cmd
+   npm install
+   ```
+4. Jalankan server development:
+   ```cmd
+   npm run dev
+   ```
+5. Buka browser dan akses [http://localhost:3000](http://localhost:3000) untuk melihat aplikasi.
+
+> **Catatan:** Pastikan server backend (Langkah 4) tetap berjalan di terminal terpisah agar frontend dapat mengambil data dari API dengan baik.
+
+## Akun Admin (Default)
+
+Gunakan kredensial berikut untuk login sebagai admin dan menguji fitur-fitur pada sisi admin:
+
+- **Email:** admin0@gmail.com
+- **Password:** admin123
 
 ## Troubleshooting (Penyelesaian Masalah)
 
@@ -79,3 +106,5 @@
   ```powershell
   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
   ```
+- **Halaman frontend tidak bisa mengambil data / error saat fetch API**
+  Pastikan server backend (Langkah 4) sudah berjalan terlebih dahulu sebelum menjalankan frontend, dan cek apakah port backend sesuai dengan konfigurasi yang digunakan frontend.

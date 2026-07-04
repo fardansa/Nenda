@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Nov 19, 2025 at 04:13 PM
+-- Generation Time: Jul 04, 2026 at 03:29 AM
 -- Server version: 10.4.28-MariaDB
 -- PHP Version: 8.2.4
 
@@ -33,6 +33,22 @@ CREATE TABLE `detail_pemesanan` (
   `tent_id` int(11) UNSIGNED NOT NULL,
   `harga_per_malam` int(10) NOT NULL,
   `subtotal` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `notifikasi`
+--
+
+CREATE TABLE `notifikasi` (
+  `notifikasi_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL,
+  `pemesanan_id` int(10) UNSIGNED NOT NULL,
+  `judul` varchar(100) NOT NULL,
+  `pesan` text NOT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -86,7 +102,9 @@ CREATE TABLE `pemesanan_master` (
   `tanggal_checkin` date NOT NULL,
   `tanggal_checkout` date NOT NULL,
   `total_harga` int(11) NOT NULL,
-  `status_pemesanan` enum('menunggu_pembayaran','menunggu_konfirmasi','telah_dibayar','expired','dibatalkan') NOT NULL DEFAULT 'menunggu_pembayaran',
+  `status_pemesanan` enum('menunggu_pembayaran','menunggu_konfirmasi','telah_dibayar','expired','dibatalkan','ditolak_admin') NOT NULL DEFAULT 'menunggu_pembayaran',
+  `alasan_admin` enum('tenda_penuh','bukti_pembayaran_tidak_valid','tenda_rusak','cuaca_buruk','lainnya') DEFAULT NULL,
+  `catatan_admin` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `expired_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -166,9 +184,12 @@ CREATE TABLE `user` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-INSERT INTO `user` (`nama`, `email`, `password`, `role`, `created_at`) VALUES
-('Admin', 'admin@nenda.com', '$2b$12$zbRffDlEOL8eo74CJej2Ne9LWu6FKrf04ahb9XhX6Q4/7dndv45RW', 'admin', '2023-01-01 00:00:00'),
-('User', 'user@nenda.com', '$2b$12$6v0DmE6B/nPGu6vNGE2jdenBKqu5lK5CtdZuzfEnBPxb53SyhWH0K', 'user', '2023-01-01 00:00:00');
+--
+-- Dumping data for table `user`
+--
+
+INSERT INTO `user` (`user_id`, `nama`, `email`, `password`, `role`, `created_at`) VALUES
+(1, 'admin0', 'admin0@gmail.com', '$2b$12$e.NUWaX.ZhSbhCbd6XB1TuS5NykivXVJ.hfY2NGU46hpkDUqnampe', 'admin', '2026-07-04 01:27:40');
 
 --
 -- Indexes for dumped tables
@@ -181,6 +202,14 @@ ALTER TABLE `detail_pemesanan`
   ADD PRIMARY KEY (`detail_id`),
   ADD KEY `fk_detail_pemesanan_master` (`pemesanan_id`),
   ADD KEY `fk_detail_tent` (`tent_id`);
+
+--
+-- Indexes for table `notifikasi`
+--
+ALTER TABLE `notifikasi`
+  ADD PRIMARY KEY (`notifikasi_id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `pemesanan_id` (`pemesanan_id`);
 
 --
 -- Indexes for table `paket`
@@ -227,10 +256,16 @@ ALTER TABLE `detail_pemesanan`
   MODIFY `detail_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `notifikasi`
+--
+ALTER TABLE `notifikasi`
+  MODIFY `notifikasi_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `paket`
 --
 ALTER TABLE `paket`
-  MODIFY `paket_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `paket_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `pembayaran`
@@ -248,13 +283,13 @@ ALTER TABLE `pemesanan_master`
 -- AUTO_INCREMENT for table `tent`
 --
 ALTER TABLE `tent`
-  MODIFY `tent_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+  MODIFY `tent_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
 
 --
 -- AUTO_INCREMENT for table `user`
 --
 ALTER TABLE `user`
-  MODIFY `user_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `user_id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- Constraints for dumped tables
@@ -266,6 +301,13 @@ ALTER TABLE `user`
 ALTER TABLE `detail_pemesanan`
   ADD CONSTRAINT `fk_detail_pemesanan_master` FOREIGN KEY (`pemesanan_id`) REFERENCES `pemesanan_master` (`pemesanan_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_detail_tent` FOREIGN KEY (`tent_id`) REFERENCES `tent` (`tent_id`) ON UPDATE CASCADE;
+
+--
+-- Constraints for table `notifikasi`
+--
+ALTER TABLE `notifikasi`
+  ADD CONSTRAINT `notifikasi_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `notifikasi_ibfk_2` FOREIGN KEY (`pemesanan_id`) REFERENCES `pemesanan_master` (`pemesanan_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `pembayaran`

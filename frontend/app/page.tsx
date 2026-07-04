@@ -85,9 +85,7 @@ export default function HomePage() {
             <Link href="#katalog" className="hover:text-emerald-600 transition">
               Katalog Tenda
             </Link>
-            <Link href="#" className="hover:text-emerald-600 transition">
-              Fasilitas
-            </Link>
+            
           </div>
 
           <div>
